@@ -67,3 +67,18 @@ CREATE TABLE IF NOT EXISTS setlist (
 );
 CREATE INDEX IF NOT EXISTS idx_setlist_concert ON setlist(concert_id, position);
 CREATE INDEX IF NOT EXISTS idx_setlist_keys ON setlist(artist_key, title_key);
+
+-- Сообщения чата с видео: источник правды, заполняется fetch'ем.
+CREATE TABLE IF NOT EXISTS videos (
+  msg_id          INTEGER PRIMARY KEY,
+  date_utc        TEXT NOT NULL,      -- ISO8601, UTC
+  caption         TEXT NOT NULL DEFAULT '',
+  link            TEXT NOT NULL,
+  grouped_id      INTEGER,            -- альбом: несколько видео с одной подписью
+  reply_to_msg_id INTEGER,
+  reply_text      TEXT,               -- текст сообщения, на которое отвечает видео
+  duration        INTEGER,            -- секунд
+  fetched_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_videos_date ON videos(date_utc);
+CREATE INDEX IF NOT EXISTS idx_videos_group ON videos(grouped_id);

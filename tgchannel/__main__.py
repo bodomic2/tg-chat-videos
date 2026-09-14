@@ -23,8 +23,10 @@ def main(argv=None):
     )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p_fetch = sub.add_parser("fetch", help="скачать историю канала в БД")
-    p_fetch.add_argument("--limit", type=int, help="не больше N постов за запуск")
+    sub.add_parser("login", help="разовый интерактивный вход в Telegram (создаёт сессию)")
+
+    p_fetch = sub.add_parser("fetch", help="скачать сообщения с видео из чата в БД")
+    p_fetch.add_argument("--limit", type=int, help="не больше N видео за запуск")
     p_fetch.add_argument("--full", action="store_true", help="качать с самого начала заново")
 
     p_parse = sub.add_parser("parse", help="разобрать посты в песни и исполнения")
@@ -59,8 +61,13 @@ def main(argv=None):
     args = ap.parse_args(argv)
     conn = db.connect()
     try:
-        if args.cmd in ("fetch", "all"):
+        if args.cmd == "login":
             from . import fetch  # импорт telethon только когда он реально нужен
+
+            fetch.login()
+
+        if args.cmd in ("fetch", "all"):
+            from . import fetch
 
             fetch.run(conn, limit=args.limit, full=args.full)
 
