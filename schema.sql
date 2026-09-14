@@ -37,3 +37,47 @@ CREATE TABLE IF NOT EXISTS appearances (
 CREATE INDEX IF NOT EXISTS idx_appearances_date ON appearances(date_utc);
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+
+-- Концерты с thejammers.org/archive. raw_json — треки как отдал сайт, для пересборки.
+CREATE TABLE IF NOT EXISTS concerts (
+  id          TEXT PRIMARY KEY,      -- id события на сайте
+  date        TEXT NOT NULL,         -- YYYY-MM-DD
+  time        TEXT,
+  title       TEXT NOT NULL,
+  venue       TEXT,
+  url         TEXT NOT NULL,
+  track_count INTEGER,
+  raw_json    TEXT NOT NULL,
+  fetched_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_concerts_date ON concerts(date);
+
+-- Сетлист: по строке на трек концерта, в порядке сайта.
+CREATE TABLE IF NOT EXISTS setlist (
+  id         TEXT PRIMARY KEY,       -- id трека на сайте
+  concert_id TEXT NOT NULL REFERENCES concerts(id) ON DELETE CASCADE,
+  position   INTEGER NOT NULL,
+  artist     TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  artist_key TEXT NOT NULL,
+  title_key  TEXT NOT NULL,
+  state      TEXT,
+  ready      INTEGER NOT NULL DEFAULT 0,  -- 1 = все обязательные места заняты
+  comment    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_setlist_concert ON setlist(concert_id, position);
+CREATE INDEX IF NOT EXISTS idx_setlist_keys ON setlist(artist_key, title_key);
+
+-- Состав: кто на каком месте в треке. username — telegram без @.
+CREATE TABLE IF NOT EXISTS lineup (
+  id         TEXT PRIMARY KEY,       -- id места на сайте
+  track_id   TEXT NOT NULL REFERENCES setlist(id) ON DELETE CASCADE,
+  slot       TEXT NOT NULL,          -- vocals | guitars | bass | drums | keys
+  label      TEXT NOT NULL,          -- Vocal 1, Guitar 2, ...
+  seat_index INTEGER,
+  username   TEXT,
+  full_name  TEXT,
+  status     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_lineup_track ON lineup(track_id);
+CREATE INDEX IF NOT EXISTS idx_lineup_user ON lineup(username);

@@ -24,7 +24,7 @@ def load_env():
 
 def db_path():
     load_env()
-    return Path(os.environ.get("TG_DB") or ROOT / "tg_channel_log.db")
+    return Path(os.environ.get("TG_DB") or ROOT / "tg_chat_videos.db")
 
 
 def _require(name, hint):

@@ -44,6 +44,11 @@ def main(argv=None):
     p_export.add_argument("--no-dates", action="store_true",
                           help="только «Исполнитель - Название» (для txt)")
 
+    p_concerts = sub.add_parser("concerts", help="скачать концерты и сетлисты с thejammers.org")
+    p_concerts.add_argument("--force", action="store_true", help="перекачать и уже известные концерты")
+    p_concerts.add_argument("--reparse", action="store_true",
+                            help="пересобрать сетлисты из сохранённого JSON, сайт не трогать")
+
     sub.add_parser("stats", help="сводка по базе")
 
     p_all = sub.add_parser("all", help="fetch + parse + catalog")
@@ -58,6 +63,14 @@ def main(argv=None):
             from . import fetch  # импорт telethon только когда он реально нужен
 
             fetch.run(conn, limit=args.limit, full=args.full)
+
+        if args.cmd == "concerts":
+            from . import jammers
+
+            if args.reparse:
+                jammers.reparse(conn)
+            else:
+                jammers.run(conn, force=args.force)
 
         if args.cmd == "parse":
             if args.dry_run:
