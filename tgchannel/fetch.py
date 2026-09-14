@@ -5,7 +5,8 @@
 пользовательская сессия (api_id/api_hash с my.telegram.org + вход по номеру).
 
 Фильтр по видео серверный (InputMessagesFilterVideo), так что текстовая история
-чата не выкачивается. Для видео-ответов дотягивается текст того сообщения, на
+чата не выкачивается. Видео до первого концерта (таблица concerts) не берутся —
+им не к чему привязываться, а в подвал идут только видео из окна какого-то концерта. Для видео-ответов дотягивается текст того сообщения, на
 которое отвечали, — там часто написано, что за песня.
 """
 
@@ -46,6 +47,24 @@ async def _open(client):
             "Сессия не авторизована. Войдите один раз интерактивно: "
             ".venv-win/Scripts/python -m tgchannel login"
         )
+
+
+def first_concert_date(conn):
+    """Дата самого раннего концерта как aware datetime (UTC), или None, если концертов нет."""
+    row = conn.execute("SELECT min(date) FROM concerts").fetchone()
+    if not row or not row[0]:
+        return None
+    return datetime.fromisoformat(row[0]).replace(tzinfo=timezone.utc)
+
+
+async def last_msg_id_before(client, entity, when):
+    """id последнего сообщения чата до момента when (0, если таких нет).
+
+    offset_date у поиска с фильтром не работает, поэтому граница по дате
+    переводится в границу по id одним запросом без фильтра.
+    """
+    before = await client.get_messages(entity, limit=1, offset_date=when)
+    return before[0].id if before else 0
 
 
 async def _fetch_videos(client, conn, entity, username, internal_id, min_id, limit):
@@ -110,8 +129,12 @@ async def _run(conn, limit=None, full=False):
         db.set_meta(conn, "channel_title", title)
         db.set_meta(conn, "channel_username", username or "")
 
-        min_id = 0 if full else int(db.get_meta(conn, "last_video_msg_id", 0) or 0)
         print(f"Чат: {title}" + (f" (@{username})" if username else " (приватный)"))
+        min_id = 0 if full else int(db.get_meta(conn, "last_video_msg_id", 0) or 0)
+        since = first_concert_date(conn)
+        if since and not min_id:
+            min_id = await last_msg_id_before(client, entity, since)
+            print(f"Первый концерт {since:%Y-%m-%d} — начинаю после msg_id {min_id}")
         print(f"Качаю видео с msg_id > {min_id}" + (f", не больше {limit}" if limit else ""))
         saved = await _fetch_videos(client, conn, entity, username, internal_id, min_id, limit)
         print(f"Сохранено видео: {saved}.")
