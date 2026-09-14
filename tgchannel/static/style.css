@@ -40,3 +40,6 @@ details.edit form { display: flex; gap: 6px; flex-wrap: wrap; align-items: cente
 details.edit select { max-width: 100%; padding: 5px; font-size: 14px; }
 blockquote { margin: 0 0 8px; padding-left: 8px; border-left: 2px solid var(--line); white-space: pre-wrap; color: var(--muted); font-size: 13px; }
 @media (max-width: 640px) { th, td { padding: 6px 4px; } main { padding: 10px; } }
+.lineup { font-size: 12px; color: var(--muted); }
+.lineup a { color: var(--muted); }
+.lineup a:hover { color: var(--accent); }

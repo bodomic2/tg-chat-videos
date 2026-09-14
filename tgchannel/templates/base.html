@@ -11,6 +11,7 @@
   <nav>
     <a href="{{ url_for('catalog') }}" {% if request.endpoint == 'catalog' %}class="active"{% endif %}>Каталог</a>
     <a href="{{ url_for('concerts') }}" {% if request.endpoint in ('concerts', 'concert') %}class="active"{% endif %}>Концерты</a>
+    <a href="{{ url_for('musicians') }}" {% if request.endpoint in ('musicians', 'musician') %}class="active"{% endif %}>Музыканты</a>
   </nav>
 </header>
 <main>

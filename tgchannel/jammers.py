@@ -3,8 +3,8 @@
 Сайт на Next.js: список концертов (/archive) отрендерен в HTML, а на странице
 концерта (/events/<id>) треки и состав лежат в RSC-потоке — кусках
 `self.__next_f.push([1,"…"])`, из которых собирается JSON. Оттуда берём
-исполнителя, название и занятость мест (готов ли трек). Кто именно играл, в базу
-не пишется — каталогу нужны только песня и дата концерта.
+исполнителя, название, занятость мест (готов ли трек) и состав — кто на каком
+месте, чтобы искать видео по музыканту.
 
 Сырой JSON треков сохраняется в concerts.raw_json, так что разбор можно
 перегнать без повторной выкачки: `concerts --reparse`.
@@ -117,17 +117,29 @@ def extract_tracks(page):
 
 
 def flatten_track(track, position):
-    """Одна запись сетлиста из сырого трека сайта.
+    """Одна запись сетлиста + состав из сырого трека сайта.
 
     ready = все обязательные места заняты (необязательные и закрытые не считаются).
+    В состав идут только занятые места с известным пользователем.
     """
     song = track["song"]
     artist = ((song.get("artist") or {}).get("name") or "").strip()
     title = (song.get("title") or "").strip()
-    required = [
-        s.get("status") for s in track.get("seats") or []
-        if not s.get("isOptional") and s.get("status") != "UNAVAILABLE"
-    ]
+    seats = track.get("seats") or []
+    required = [s.get("status") for s in seats if not s.get("isOptional") and s.get("status") != "UNAVAILABLE"]
+    lineup = []
+    for seat in seats:
+        user = seat.get("user") or {}
+        if seat.get("status") != "CLAIMED" or not (user.get("telegramUsername") or user.get("fullName")):
+            continue
+        slot = seat.get("lineupSlot") or {}
+        lineup.append({
+            "id": seat["id"],
+            "slot": slot.get("key") or "",
+            "label": seat.get("label") or slot.get("label") or "",
+            "username": user.get("telegramUsername"),
+            "full_name": user.get("fullName"),
+        })
     return {
         "id": track["id"],
         "position": position,
@@ -138,6 +150,7 @@ def flatten_track(track, position):
         "state": track.get("state"),
         "ready": int(bool(required) and all(st == "CLAIMED" for st in required)),
         "comment": track.get("comment"),
+        "lineup": lineup,
     }
 
 
@@ -159,16 +172,32 @@ def store_concert(conn, concert, raw_tracks, fetched_at):
 
 
 def store_setlist(conn, concert_id, raw_tracks):
-    """Пересобирает сетлист концерта из сырого JSON."""
-    conn.execute("DELETE FROM setlist WHERE concert_id = ?", (concert_id,))
+    """Обновляет сетлист и состав концерта из сырого JSON.
+
+    Треки обновляются по id (он у сайта стабильный), а не удаляются и вставляются
+    заново: на setlist ссылаются matches, и DELETE снёс бы ручные привязки.
+    """
+    tracks = [flatten_track(raw, pos) for pos, raw in enumerate(raw_tracks, 1)]
     conn.executemany(
         "INSERT INTO setlist(id, concert_id, position, artist, title, artist_key, title_key, "
-        "state, ready, comment) VALUES(?,?,?,?,?,?,?,?,?,?)",
-        [
-            (t["id"], concert_id, t["position"], t["artist"], t["title"],
-             t["artist_key"], t["title_key"], t["state"], t["ready"], t["comment"])
-            for t in (flatten_track(raw, pos) for pos, raw in enumerate(raw_tracks, 1))
-        ],
+        "state, ready, comment) VALUES(?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(id) DO UPDATE SET concert_id = excluded.concert_id, "
+        "position = excluded.position, artist = excluded.artist, title = excluded.title, "
+        "artist_key = excluded.artist_key, title_key = excluded.title_key, "
+        "state = excluded.state, ready = excluded.ready, comment = excluded.comment",
+        [(t["id"], concert_id, t["position"], t["artist"], t["title"],
+          t["artist_key"], t["title_key"], t["state"], t["ready"], t["comment"]) for t in tracks],
+    )
+    ids = [t["id"] for t in tracks]
+    marks = ",".join("?" * len(ids)) or "''"
+    conn.execute(f"DELETE FROM setlist WHERE concert_id = ? AND id NOT IN ({marks})", [concert_id, *ids])
+    conn.execute(
+        "DELETE FROM lineup WHERE track_id IN (SELECT id FROM setlist WHERE concert_id = ?)", (concert_id,)
+    )
+    conn.executemany(
+        "INSERT INTO lineup(id, track_id, slot, label, username, full_name) VALUES(?,?,?,?,?,?)",
+        [(m["id"], t["id"], m["slot"], m["label"], m["username"], m["full_name"])
+         for t in tracks for m in t["lineup"]],
     )
 
 

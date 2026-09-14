@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_video.html" import video %}
+{% from "_video.html" import video, lineup %}
 {% block title %}{{ concert.date | short_date }} · {{ concert.title }}{% endblock %}
 {% block content %}
 {% set here = url_for('concert', concert_id=concert.id) %}
@@ -9,8 +9,8 @@
 
 <ol class="setlist">
 {% for t in setlist %}
-<li id="t{{ t.id }}" value="{{ t.position }}" class="{% if not t.ready %}notready{% endif %}">
-  <span class="song"><b>{{ t.artist }}</b> — {{ t.title }}</span>
+<li id="t{{ t.track_id }}" value="{{ t.position }}" class="{% if not t.ready %}notready{% endif %}">
+  <span class="song"><b>{{ t.artist }}</b> — {{ t.title }}</span> {{ lineup(t.musicians) }}
   {% if t.videos %}
   <ul class="videos">{% for v in t.videos %}{{ video(v, setlist, here) }}{% endfor %}</ul>
   {% endif %}

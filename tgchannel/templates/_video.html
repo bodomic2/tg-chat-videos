@@ -11,7 +11,7 @@
     <form method="post" action="{{ url_for('edit_video', msg_id=v.msg_id) }}">
       <input type="hidden" name="next" value="{{ next_url }}">
       <select name="track_id">
-        {% for t in tracks %}<option value="{{ t.id }}">{{ t.position }}. {{ t.artist }} — {{ t.title }}</option>{% endfor %}
+        {% for t in tracks %}<option value="{{ t.track_id }}">{{ t.position }}. {{ t.artist }} — {{ t.title }}</option>{% endfor %}
       </select>
       <button name="action" value="match">Это эта песня</button>
       <button name="action" value="hide" class="quiet">Не с концерта</button>
@@ -19,4 +19,9 @@
     </form>
   </details>
 </li>
+{% endmacro %}
+
+{# Состав трека: ники ссылками на страницу музыканта. #}
+{% macro lineup(musicians) %}
+{% if musicians %}<span class="lineup">{% for m in musicians %}<a href="{{ url_for('musician', username=m.username) }}" title="{{ m.label }}{% if m.full_name %} · {{ m.full_name }}{% endif %}">@{{ m.username }}</a>{% if not loop.last %} {% endif %}{% endfor %}</span>{% endif %}
 {% endmacro %}

@@ -76,32 +76,35 @@ app.jinja_env.filters["short_date"] = short_date
 
 # --- выборки -----------------------------------------------------------------
 
-MATCHED_SQL = """
-SELECT s.id AS track_id, s.position, s.artist, s.title, s.artist_key, s.title_key,
-       c.id AS concert_id, c.date AS concert_date, c.title AS concert_title,
-       v.msg_id, v.date_utc, v.caption, v.link, v.duration, m.confidence
-FROM matches m
-JOIN videos v ON v.msg_id = m.msg_id
-JOIN setlist s ON s.id = m.track_id
-JOIN concerts c ON c.id = s.concert_id
+TRACK_SQL = """
+SELECT s.id AS track_id, s.position, s.artist, s.title, s.artist_key, s.title_key, s.ready,
+       c.id AS concert_id, c.date AS concert_date, c.title AS concert_title
+FROM setlist s JOIN concerts c ON c.id = s.concert_id
+"""
+VIDEO_SQL = """
+SELECT m.track_id, m.confidence, v.msg_id, v.date_utc, v.caption, v.link, v.duration
+FROM matches m JOIN videos v ON v.msg_id = m.msg_id
 WHERE v.hidden = 0
 """
+HAS_VIDEO = "s.id IN (SELECT m.track_id FROM matches m JOIN videos v ON v.msg_id = m.msg_id WHERE v.hidden = 0)"
 
 
-def matched_tracks(where="", params=()):
-    """[{track…, videos: [...]}] — песни, у которых есть хотя бы одно видео."""
-    rows = conn().execute(MATCHED_SQL + where + " ORDER BY c.date, s.position, v.msg_id", params).fetchall()
-    tracks = {}
-    for row in rows:
-        track = tracks.setdefault(row["track_id"], {
-            "track_id": row["track_id"], "position": row["position"],
-            "artist": row["artist"], "title": row["title"],
-            "artist_key": row["artist_key"], "title_key": row["title_key"],
-            "concert_id": row["concert_id"], "concert_date": row["concert_date"],
-            "concert_title": row["concert_title"], "videos": [],
-        })
-        track["videos"].append(video_view(row, row["concert_date"]))
-    return list(tracks.values())
+def tracks(where, params=()):
+    """[{track…, musicians: [...], videos: [...]}] по условию на setlist (s) / concerts (c)."""
+    rows = conn().execute(TRACK_SQL + "WHERE " + where + " ORDER BY c.date, s.position", params).fetchall()
+    out = {r["track_id"]: dict(r, musicians=[], videos=[]) for r in rows}
+    if not out:
+        return []
+    ids = list(out)
+    marks = ",".join("?" * len(ids))
+    for r in conn().execute(
+        f"SELECT track_id, slot, label, username, full_name FROM lineup "
+        f"WHERE track_id IN ({marks}) ORDER BY rowid", ids,
+    ):
+        out[r["track_id"]]["musicians"].append(dict(r))
+    for r in conn().execute(VIDEO_SQL + f"AND m.track_id IN ({marks}) ORDER BY v.msg_id", ids):
+        out[r["track_id"]]["videos"].append(video_view(r, out[r["track_id"]]["concert_date"]))
+    return list(out.values())
 
 
 def basement(concert_id, concert_date):
@@ -122,11 +125,14 @@ def basement(concert_id, concert_date):
     return out
 
 
-def setlist_of(concert_id):
-    return conn().execute(
-        "SELECT id, position, artist, title, ready FROM setlist WHERE concert_id = ? ORDER BY position",
-        (concert_id,),
-    ).fetchall()
+def track_matches(track, needle):
+    """Поиск: исполнитель, песня, дата концерта, ник или имя музыканта."""
+    return (
+        needle in track["artist_key"] or needle in track["title_key"]
+        or needle in track["concert_date"] or needle in short_date(track["concert_date"])
+        or any(needle in (m["username"] or "").casefold() or needle in norm_key(m["full_name"])
+               for m in track["musicians"])
+    )
 
 
 # --- страницы ----------------------------------------------------------------
@@ -140,22 +146,43 @@ SORTS = {
 
 @app.get("/")
 def catalog():
-    q = request.args.get("q", "").strip()
+    return render_catalog(tracks(HAS_VIDEO), title="Видео с гигов The Jammers")
+
+
+@app.get("/musicians")
+def musicians():
+    rows = conn().execute(
+        "SELECT l.username, max(l.full_name) AS full_name, count(DISTINCT l.track_id) AS songs, "
+        "  count(DISTINCT m.track_id) AS with_video "
+        "FROM lineup l LEFT JOIN matches m ON m.track_id = l.track_id "
+        "  AND m.msg_id IN (SELECT msg_id FROM videos WHERE hidden = 0) "
+        "GROUP BY l.username ORDER BY songs DESC, l.username"
+    ).fetchall()
+    return render_template("musicians.html", musicians=rows)
+
+
+@app.get("/musician/<username>")
+def musician(username):
+    rows = tracks("s.id IN (SELECT track_id FROM lineup WHERE username = ?)", (username,))
+    if not rows:
+        abort(404)
+    name = next((m["full_name"] for t in rows for m in t["musicians"] if m["username"] == username), "")
+    return render_catalog(rows, title=f"@{username}" + (f" — {name}" if name and name != username else ""),
+                          musician=username)
+
+
+def render_catalog(rows, title, musician=None):
+    q = request.args.get("q", "").strip().lstrip("@")
     sort = request.args.get("sort", "date")
     if sort not in SORTS:
         sort = "date"
     desc = request.args.get("dir", "desc" if sort == "date" else "asc") == "desc"
-    tracks = matched_tracks()
     if q:
         needle = norm_key(q)
-        tracks = [
-            t for t in tracks
-            if needle in t["artist_key"] or needle in t["title_key"]
-            or needle in t["concert_date"] or needle in short_date(t["concert_date"])
-        ]
-    tracks.sort(key=SORTS[sort], reverse=desc)
-    return render_template("catalog.html", tracks=tracks, q=q, sort=sort, desc=desc,
-                           stats=db.counts(conn()))
+        rows = [t for t in rows if track_matches(t, needle)]
+    rows.sort(key=SORTS[sort], reverse=desc)
+    return render_template("catalog.html", tracks=rows, q=q, sort=sort, desc=desc, title=title,
+                           musician=musician, stats=db.counts(conn()))
 
 
 @app.get("/concerts")
@@ -179,10 +206,8 @@ def concert(concert_id):
     row = conn().execute("SELECT * FROM concerts WHERE id = ?", (concert_id,)).fetchone()
     if row is None:
         abort(404)
-    videos_by_track = {t["track_id"]: t["videos"] for t in matched_tracks("AND c.id = ?", (concert_id,))}
-    setlist = [dict(t, videos=videos_by_track.get(t["id"], [])) for t in setlist_of(concert_id)]
     return render_template(
-        "concert.html", concert=row, setlist=setlist,
+        "concert.html", concert=row, setlist=tracks("c.id = ?", (concert_id,)),
         unsorted=basement(concert_id, row["date"]), near_days=NEAR_DAYS,
     )
 
