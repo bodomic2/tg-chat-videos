@@ -3,7 +3,8 @@
 Сайт на Next.js: список концертов (/archive) отрендерен в HTML, а на странице
 концерта (/events/<id>) треки и состав лежат в RSC-потоке — кусках
 `self.__next_f.push([1,"…"])`, из которых собирается JSON. Оттуда берём
-исполнителя, название, состояние трека и кто на каком месте сидит (telegram-ник).
+исполнителя, название и занятость мест (готов ли трек). Кто именно играл, в базу
+не пишется — каталогу нужны только песня и дата концерта.
 
 Сырой JSON треков сохраняется в concerts.raw_json, так что разбор можно
 перегнать без повторной выкачки: `concerts --reparse`.
@@ -116,36 +117,27 @@ def extract_tracks(page):
 
 
 def flatten_track(track, position):
-    """Одна запись сетлиста + состав из сырого трека сайта."""
+    """Одна запись сетлиста из сырого трека сайта.
+
+    ready = все обязательные места заняты (необязательные и закрытые не считаются).
+    """
     song = track["song"]
-    artist = (song.get("artist") or {}).get("name") or ""
-    title = song.get("title") or ""
-    lineup = []
-    for seat in track.get("seats") or []:
-        user = seat.get("user") or {}
-        slot = seat.get("lineupSlot") or {}
-        lineup.append({
-            "id": seat["id"],
-            "slot": slot.get("key") or "",
-            "label": seat.get("label") or slot.get("label") or "",
-            "seat_index": seat.get("seatIndex"),
-            "username": user.get("telegramUsername"),
-            "full_name": user.get("fullName"),
-            "status": seat.get("status"),
-            "optional": bool(seat.get("isOptional")),
-        })
-    required = [s for s in lineup if not s["optional"] and s["status"] != "UNAVAILABLE"]
+    artist = ((song.get("artist") or {}).get("name") or "").strip()
+    title = (song.get("title") or "").strip()
+    required = [
+        s.get("status") for s in track.get("seats") or []
+        if not s.get("isOptional") and s.get("status") != "UNAVAILABLE"
+    ]
     return {
         "id": track["id"],
         "position": position,
-        "artist": artist.strip(),
-        "title": title.strip(),
+        "artist": artist,
+        "title": title,
         "artist_key": norm_key(artist),
         "title_key": norm_key(title),
         "state": track.get("state"),
-        "ready": int(bool(required) and all(s["status"] == "CLAIMED" for s in required)),
+        "ready": int(bool(required) and all(st == "CLAIMED" for st in required)),
         "comment": track.get("comment"),
-        "lineup": lineup,
     }
 
 
@@ -167,28 +159,17 @@ def store_concert(conn, concert, raw_tracks, fetched_at):
 
 
 def store_setlist(conn, concert_id, raw_tracks):
-    """Пересобирает setlist/lineup концерта из сырого JSON."""
+    """Пересобирает сетлист концерта из сырого JSON."""
     conn.execute("DELETE FROM setlist WHERE concert_id = ?", (concert_id,))
-    for position, raw in enumerate(raw_tracks, 1):
-        track = flatten_track(raw, position)
-        conn.execute(
-            "INSERT INTO setlist(id, concert_id, position, artist, title, artist_key, title_key, "
-            "state, ready, comment) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            (
-                track["id"], concert_id, position, track["artist"], track["title"],
-                track["artist_key"], track["title_key"], track["state"], track["ready"],
-                track["comment"],
-            ),
-        )
-        conn.executemany(
-            "INSERT INTO lineup(id, track_id, slot, label, seat_index, username, full_name, status) "
-            "VALUES(?,?,?,?,?,?,?,?)",
-            [
-                (s["id"], track["id"], s["slot"], s["label"], s["seat_index"],
-                 s["username"], s["full_name"], s["status"])
-                for s in track["lineup"]
-            ],
-        )
+    conn.executemany(
+        "INSERT INTO setlist(id, concert_id, position, artist, title, artist_key, title_key, "
+        "state, ready, comment) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        [
+            (t["id"], concert_id, t["position"], t["artist"], t["title"],
+             t["artist_key"], t["title_key"], t["state"], t["ready"], t["comment"])
+            for t in (flatten_track(raw, pos) for pos, raw in enumerate(raw_tracks, 1))
+        ],
+    )
 
 
 def run(conn, force=False):
@@ -216,7 +197,7 @@ def run(conn, force=False):
 
 
 def reparse(conn):
-    """Пересобирает setlist/lineup из сохранённого raw_json без обращения к сайту."""
+    """Пересобирает setlist из сохранённого raw_json без обращения к сайту."""
     rows = conn.execute("SELECT id, raw_json FROM concerts").fetchall()
     for row in rows:
         store_setlist(conn, row["id"], json.loads(row["raw_json"]))

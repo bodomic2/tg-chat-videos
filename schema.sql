@@ -67,17 +67,3 @@ CREATE TABLE IF NOT EXISTS setlist (
 );
 CREATE INDEX IF NOT EXISTS idx_setlist_concert ON setlist(concert_id, position);
 CREATE INDEX IF NOT EXISTS idx_setlist_keys ON setlist(artist_key, title_key);
-
--- Состав: кто на каком месте в треке. username — telegram без @.
-CREATE TABLE IF NOT EXISTS lineup (
-  id         TEXT PRIMARY KEY,       -- id места на сайте
-  track_id   TEXT NOT NULL REFERENCES setlist(id) ON DELETE CASCADE,
-  slot       TEXT NOT NULL,          -- vocals | guitars | bass | drums | keys
-  label      TEXT NOT NULL,          -- Vocal 1, Guitar 2, ...
-  seat_index INTEGER,
-  username   TEXT,
-  full_name  TEXT,
-  status     TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_lineup_track ON lineup(track_id);
-CREATE INDEX IF NOT EXISTS idx_lineup_user ON lineup(username);
