@@ -1,11 +1,9 @@
-"""CLI: python -m tgchannel fetch | parse | catalog | all | stats"""
+"""CLI: python -m tgchannel concerts | fetch | match | all | stats | login"""
 
 import argparse
 import sys
-from pathlib import Path
 
-from . import catalog as catalog_mod
-from . import config, db, parse
+from . import config, db
 
 
 def _stdout_utf8():
@@ -19,46 +17,27 @@ def main(argv=None):
     _stdout_utf8()
     ap = argparse.ArgumentParser(
         prog="python -m tgchannel",
-        description="Выгрузка истории телеграм-канала и каталог песен из постов.",
+        description="Каталог видео с концертов The Jammers из чата музыкантов.",
     )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("login", help="разовый интерактивный вход в Telegram (создаёт сессию)")
-
-    p_fetch = sub.add_parser("fetch", help="скачать сообщения с видео из чата в БД")
-    p_fetch.add_argument("--limit", type=int, help="не больше N видео за запуск")
-    p_fetch.add_argument("--full", action="store_true", help="качать с самого начала заново")
-
-    p_parse = sub.add_parser("parse", help="разобрать посты в песни и исполнения")
-    p_parse.add_argument("--dry-run", action="store_true", help="показать разбор, не писать в БД")
-    p_parse.add_argument("--sample", type=int, default=30, help="сколько постов показать (dry-run)")
-    p_parse.add_argument("--status", choices=("ok", "maybe", "other", "empty"),
-                         help="в dry-run показывать только посты с этим статусом")
-
-    p_catalog = sub.add_parser("catalog", help="сгенерировать out/CATALOG.md и out/catalog.html")
-    p_catalog.add_argument("--with-maybe", action="store_true",
-                           help="добавить в каталог даты из «похожих» постов про уже известные песни")
-    p_export = sub.add_parser("export", help="список распознанных песен: txt или json")
-    p_export.add_argument("--format", choices=("txt", "json"), default="txt")
-    p_export.add_argument("--out", help="файл вместо stdout")
-    p_export.add_argument("--with-maybe", action="store_true",
-                          help="добавить даты из «похожих» постов про известные песни")
-    p_export.add_argument("--no-dates", action="store_true",
-                          help="только «Исполнитель - Название» (для txt)")
 
     p_concerts = sub.add_parser("concerts", help="скачать концерты и сетлисты с thejammers.org")
     p_concerts.add_argument("--force", action="store_true", help="перекачать и уже известные концерты")
     p_concerts.add_argument("--reparse", action="store_true",
                             help="пересобрать сетлисты из сохранённого JSON, сайт не трогать")
 
+    p_fetch = sub.add_parser("fetch", help="скачать сообщения с видео из чата в БД")
+    p_fetch.add_argument("--limit", type=int, help="не больше N видео за запуск")
+    p_fetch.add_argument("--full", action="store_true", help="качать с самого начала заново")
+
     sub.add_parser("match", help="привязать видео к концертам и песням сетлистов")
 
-    sub.add_parser("stats", help="сводка по базе")
-
-    p_all = sub.add_parser("all", help="fetch + parse + catalog")
+    p_all = sub.add_parser("all", help="concerts + fetch + match")
     p_all.add_argument("--limit", type=int)
-    p_all.add_argument("--full", action="store_true")
-    p_all.add_argument("--with-maybe", action="store_true")
+
+    sub.add_parser("stats", help="сводка по базе")
 
     args = ap.parse_args(argv)
     conn = db.connect()
@@ -68,11 +47,6 @@ def main(argv=None):
 
             fetch.login()
 
-        if args.cmd in ("fetch", "all"):
-            from . import fetch
-
-            fetch.run(conn, limit=args.limit, full=args.full)
-
         if args.cmd == "concerts":
             from . import jammers
 
@@ -81,38 +55,25 @@ def main(argv=None):
             else:
                 jammers.run(conn, force=args.force)
 
-        if args.cmd == "match":
+        if args.cmd == "all":
+            from . import jammers
+
+            jammers.run(conn)
+
+        if args.cmd in ("fetch", "all"):
+            from . import fetch
+
+            fetch.run(conn, limit=args.limit, full=getattr(args, "full", False))
+
+        if args.cmd in ("match", "all"):
             from . import match
 
             match.run(conn)
 
-        if args.cmd == "parse":
-            if args.dry_run:
-                parse.dry_run(conn, sample=args.sample, status=args.status)
-                return 0
-            print("Разбор постов:")
-            parse.reparse_all(conn)
-
-        if args.cmd == "all":
-            print("Разбор постов:")
-            parse.reparse_all(conn)
-
-        if args.cmd in ("catalog", "all"):
-            catalog_mod.generate(conn, include_maybe=args.with_maybe)
-
-        if args.cmd == "export":
-            catalog_mod.export(
-                conn,
-                fmt=args.format,
-                out_path=Path(args.out) if args.out else None,
-                include_maybe=args.with_maybe,
-                with_dates=not args.no_dates,
-            )
-
         if args.cmd == "stats":
             print(f"База: {config.db_path()}")
             for key, value in db.counts(conn).items():
-                print(f"  {key:12} {value}")
+                print(f"  {key:18} {value}")
     finally:
         conn.commit()
         conn.close()

@@ -17,7 +17,7 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
-from .parse import norm_key
+from .text import norm_key
 
 BASE = "https://thejammers.org"
 ARCHIVE_URL = BASE + "/archive"

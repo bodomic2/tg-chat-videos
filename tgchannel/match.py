@@ -24,7 +24,7 @@ import difflib
 import re
 import unicodedata
 
-from .parse import QUOTES
+from .text import QUOTES
 
 TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
 PARENS = re.compile(r"\s*[(\[][^()\[\]]*[)\]]")
@@ -105,7 +105,7 @@ def title_stands_alone(title):
 
 
 def match_by_number(text, tracks):
-    """Подпись с номером сетлиста: трек на этой позиции, если название хоть как-то совпало."""
+    """Подпись с номером сетлиста: трек на этой позиции, если название совпало."""
     m = NUMBERED.match(text)
     if not m:
         return None

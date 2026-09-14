@@ -36,16 +36,14 @@ def set_meta(conn, key, value):
 
 
 def counts(conn):
-    """Сводка для человека: сколько постов, песен, исполнений."""
+    """Сводка для человека: концерты, песни, видео и привязки."""
     q = lambda sql: conn.execute(sql).fetchone()[0]
     return {
-        "messages": q("SELECT count(*) FROM messages"),
-        "catalog_posts": q("SELECT count(*) FROM messages WHERE parse_status = 'ok'"),
-        "maybe_posts": q("SELECT count(*) FROM messages WHERE parse_status = 'maybe'"),
-        "other_posts": q("SELECT count(*) FROM messages WHERE parse_status NOT IN ('ok','maybe')"),
-        "artists": q("SELECT count(DISTINCT t.artist_key) FROM tracks t "
-                     "JOIN appearances a ON a.track_id = t.id WHERE a.confidence = 'ok'"),
-        "tracks": q("SELECT count(DISTINCT t.id) FROM tracks t "
-                    "JOIN appearances a ON a.track_id = t.id WHERE a.confidence = 'ok'"),
-        "appearances": q("SELECT count(*) FROM appearances WHERE confidence = 'ok'"),
+        "concerts": q("SELECT count(*) FROM concerts"),
+        "setlist": q("SELECT count(*) FROM setlist"),
+        "videos": q("SELECT count(*) FROM videos"),
+        "matched_ok": q("SELECT count(DISTINCT msg_id) FROM matches WHERE confidence = 'ok'"),
+        "matched_maybe": q("SELECT count(DISTINCT msg_id) FROM matches WHERE confidence = 'maybe'"),
+        "matched_manual": q("SELECT count(DISTINCT msg_id) FROM matches WHERE confidence = 'manual'"),
+        "songs_with_video": q("SELECT count(DISTINCT track_id) FROM matches"),
     }
