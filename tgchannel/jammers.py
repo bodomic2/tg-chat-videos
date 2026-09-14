@@ -134,6 +134,7 @@ def flatten_track(track, position):
             "status": seat.get("status"),
             "optional": bool(seat.get("isOptional")),
         })
+    required = [s for s in lineup if not s["optional"] and s["status"] != "UNAVAILABLE"]
     return {
         "id": track["id"],
         "position": position,
@@ -142,7 +143,7 @@ def flatten_track(track, position):
         "artist_key": norm_key(artist),
         "title_key": norm_key(title),
         "state": track.get("state"),
-        "ready": int(all(s["status"] != "OPEN" for s in lineup if not s["optional"])),
+        "ready": int(bool(required) and all(s["status"] == "CLAIMED" for s in required)),
         "comment": track.get("comment"),
         "lineup": lineup,
     }
