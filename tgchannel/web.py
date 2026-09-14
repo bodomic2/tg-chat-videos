@@ -216,8 +216,8 @@ def edit_video(msg_id):
     else:
         abort(400)
     c.commit()
-    target = request.form.get("next") or url_for("concert", concert_id=video["concert_id"])
-    if not target.startswith("/"):
+    target = request.form.get("next", "")
+    if not target.startswith("/") or target.startswith("//"):  # только свои пути, не //evil.com
         target = url_for("concert", concert_id=video["concert_id"])
     return redirect(target + f"#v{msg_id}")
 
