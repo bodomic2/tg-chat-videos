@@ -5,8 +5,9 @@
 пользовательская сессия (api_id/api_hash с my.telegram.org + вход по номеру).
 
 Фильтр по видео серверный (InputMessagesFilterVideo), так что текстовая история
-чата не выкачивается. Видео до первого концерта (таблица concerts) не берутся —
-им не к чему привязываться, а в подвал идут только видео из окна какого-то концерта. Для видео-ответов дотягивается текст того сообщения, на
+чата не выкачивается. Видео до первого концерта (таблица concerts) не берутся:
+им не к чему привязываться, а в подвал идут только видео из окна какого-то
+концерта. Для видео-ответов дотягивается текст того сообщения, на
 которое отвечали, — там часто написано, что за песня.
 """
 
@@ -132,6 +133,10 @@ async def _run(conn, limit=None, full=False):
         print(f"Чат: {title}" + (f" (@{username})" if username else " (приватный)"))
         min_id = 0 if full else int(db.get_meta(conn, "last_video_msg_id", 0) or 0)
         since = first_concert_date(conn)
+        if since:
+            stale = conn.execute("DELETE FROM videos WHERE date_utc < ?", (since.isoformat(),)).rowcount
+            if stale:
+                print(f"Удалено {stale} видео до первого концерта.")
         if since and not min_id:
             min_id = await last_msg_id_before(client, entity, since)
             print(f"Первый концерт {since:%Y-%m-%d} — начинаю после msg_id {min_id}")
