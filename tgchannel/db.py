@@ -9,18 +9,16 @@ def connect(path=None):
     conn = sqlite3.connect(path or config.db_path())
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    _migrate(conn)  # до схемы: она создаёт индексы по новым колонкам
     conn.executescript(config.SCHEMA.read_text(encoding="utf-8"))
-    _migrate(conn)
     return conn
 
 
 def _migrate(conn):
-    """Дотягивает старую базу до текущей схемы, чтобы не перекачивать канал."""
-    columns = {r["name"] for r in conn.execute("PRAGMA table_info(appearances)")}
-    if "confidence" not in columns:
-        conn.execute(
-            "ALTER TABLE appearances ADD COLUMN confidence TEXT NOT NULL DEFAULT 'ok'"
-        )
+    """Дотягивает старую базу до текущей схемы, чтобы не перекачивать чат."""
+    columns = {r["name"] for r in conn.execute("PRAGMA table_info(videos)")}
+    if columns and "concert_id" not in columns:
+        conn.execute("ALTER TABLE videos ADD COLUMN concert_id TEXT REFERENCES concerts(id) ON DELETE SET NULL")
         conn.commit()
 
 

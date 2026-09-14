@@ -78,7 +78,19 @@ CREATE TABLE IF NOT EXISTS videos (
   reply_to_msg_id INTEGER,
   reply_text      TEXT,               -- текст сообщения, на которое отвечает видео
   duration        INTEGER,            -- секунд
-  fetched_at      TEXT
+  fetched_at      TEXT,
+  concert_id      TEXT REFERENCES concerts(id) ON DELETE SET NULL  -- по окну дат, ставит match
 );
 CREATE INDEX IF NOT EXISTS idx_videos_date ON videos(date_utc);
 CREATE INDEX IF NOT EXISTS idx_videos_group ON videos(grouped_id);
+CREATE INDEX IF NOT EXISTS idx_videos_concert ON videos(concert_id);
+
+-- Привязка видео к песне сетлиста. manual — поставлено руками, match её не трогает.
+CREATE TABLE IF NOT EXISTS matches (
+  msg_id     INTEGER NOT NULL REFERENCES videos(msg_id) ON DELETE CASCADE,
+  track_id   TEXT NOT NULL REFERENCES setlist(id) ON DELETE CASCADE,
+  confidence TEXT NOT NULL,           -- ok | maybe | manual
+  source     TEXT,                    -- caption | album | reply | manual
+  PRIMARY KEY (msg_id, track_id)
+);
+CREATE INDEX IF NOT EXISTS idx_matches_track ON matches(track_id);

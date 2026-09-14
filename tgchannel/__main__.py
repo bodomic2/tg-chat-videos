@@ -51,6 +51,8 @@ def main(argv=None):
     p_concerts.add_argument("--reparse", action="store_true",
                             help="пересобрать сетлисты из сохранённого JSON, сайт не трогать")
 
+    sub.add_parser("match", help="привязать видео к концертам и песням сетлистов")
+
     sub.add_parser("stats", help="сводка по базе")
 
     p_all = sub.add_parser("all", help="fetch + parse + catalog")
@@ -78,6 +80,11 @@ def main(argv=None):
                 jammers.reparse(conn)
             else:
                 jammers.run(conn, force=args.force)
+
+        if args.cmd == "match":
+            from . import match
+
+            match.run(conn)
 
         if args.cmd == "parse":
             if args.dry_run:
