@@ -37,7 +37,9 @@ TITLE_RATIO = 0.82     # схожесть окна текста с назван�
 ARTIST_RATIO = 0.85
 MIN_TITLE_ALONE = 2    # токенов в названии, чтобы верить ему без исполнителя
 MIN_TITLE_ALONE_LEN = 6  # или символов, если токен один
-NEAR_DAYS = 4          # дней после концерта, пока видео ещё «с концерта»
+NEAR_DAYS = 7          # дней после концерта, пока видео ещё «с концерта»
+# «10 - Ghost (…)» — номер песни в сетлисте перед названием
+NUMBERED = re.compile(r"^\s*#?(\d{1,2})\s*[.)\-–—:]\s*(\S.*)")
 
 
 def normalize(text):
@@ -102,8 +104,23 @@ def title_stands_alone(title):
     return len(toks) >= MIN_TITLE_ALONE or (toks and len(toks[0]) >= MIN_TITLE_ALONE_LEN)
 
 
+def match_by_number(text, tracks):
+    """Подпись с номером сетлиста: трек на этой позиции, если название хоть как-то совпало."""
+    m = NUMBERED.match(text)
+    if not m:
+        return None
+    position, rest = int(m.group(1)), m.group(2)
+    for track in tracks:
+        if track["position"] == position and match_title(track["title"], key_tokens(rest)):
+            return track
+    return None
+
+
 def match_tracks(text, tracks):
     """[(track, confidence)] для текста среди треков одного концерта."""
+    numbered = match_by_number(text, tracks)
+    if numbered:
+        return [(numbered, "ok")]
     text_key = key_tokens(text)
     if not text_key:
         return []
@@ -170,7 +187,7 @@ def run(conn):
     manual = {r["msg_id"] for r in conn.execute("SELECT msg_id FROM matches WHERE confidence = 'manual'")}
 
     setlists = {}
-    for row in conn.execute("SELECT id, concert_id, artist, title, artist_key FROM setlist"):
+    for row in conn.execute("SELECT id, concert_id, position, artist, title, artist_key FROM setlist"):
         setlists.setdefault(row["concert_id"], []).append(row)
 
     stats = {"videos": 0, "ok": 0, "maybe": 0, "unmatched": 0, "manual": 0, "far": 0}
