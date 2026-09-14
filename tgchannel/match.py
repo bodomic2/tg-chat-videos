@@ -180,47 +180,79 @@ def video_texts(conn, video):
     return out
 
 
-def run(conn):
-    """Пересчитывает автоматические привязки. Ручные остаются."""
-    assign_concerts(conn)
-    conn.execute("DELETE FROM matches WHERE confidence != 'manual'")
-    manual = {r["msg_id"] for r in conn.execute("SELECT msg_id FROM matches WHERE confidence = 'manual'")}
+VIDEO_SQL = (
+    "SELECT v.msg_id, v.concert_id, v.caption, v.grouped_id, v.reply_text, v.hidden, "
+    "       julianday(v.date_utc) - julianday(c.date) AS days "
+    "FROM videos v JOIN concerts c ON c.id = v.concert_id "
+)
 
+
+def is_near(video):
+    return video["days"] < NEAR_DAYS
+
+
+def match_video(conn, video, tracks):
+    """[(track, confidence, source)] для одного видео среди треков его концерта."""
+    near = is_near(video)
+    for source, text in video_texts(conn, video):
+        hits = [(t, conf, source) for t, conf in match_tracks(text, tracks) if conf == "ok" or near]
+        if hits:
+            return hits
+    return []
+
+
+def setlists_by_concert(conn):
     setlists = {}
     for row in conn.execute("SELECT id, concert_id, position, artist, title, artist_key FROM setlist"):
         setlists.setdefault(row["concert_id"], []).append(row)
+    return setlists
 
-    stats = {"videos": 0, "ok": 0, "maybe": 0, "unmatched": 0, "manual": 0, "far": 0}
-    videos = conn.execute(
-        "SELECT v.msg_id, v.concert_id, v.caption, v.grouped_id, v.reply_text, "
-        "       julianday(v.date_utc) - julianday(c.date) AS days "
-        "FROM videos v JOIN concerts c ON c.id = v.concert_id ORDER BY v.msg_id"
-    ).fetchall()
-    for video in videos:
+
+def store_hits(conn, msg_id, hits):
+    conn.executemany(
+        "INSERT OR IGNORE INTO matches(msg_id, track_id, confidence, source) VALUES(?,?,?,?)",
+        [(msg_id, track["id"], confidence, source) for track, confidence, source in hits],
+    )
+
+
+def rematch_video(conn, msg_id):
+    """Автопривязка одного видео заново (после сброса ручной правки)."""
+    conn.execute("DELETE FROM matches WHERE msg_id = ?", (msg_id,))
+    video = conn.execute(VIDEO_SQL + "WHERE v.msg_id = ?", (msg_id,)).fetchone()
+    if video is None or video["hidden"]:
+        return []
+    tracks = [r for r in setlists_by_concert(conn).get(video["concert_id"], [])]
+    hits = match_video(conn, video, tracks)
+    store_hits(conn, msg_id, hits)
+    return hits
+
+
+def run(conn):
+    """Пересчитывает автоматические привязки. Ручные и скрытые остаются."""
+    assign_concerts(conn)
+    conn.execute("DELETE FROM matches WHERE confidence != 'manual'")
+    manual = {r["msg_id"] for r in conn.execute("SELECT msg_id FROM matches WHERE confidence = 'manual'")}
+    setlists = setlists_by_concert(conn)
+
+    stats = {"videos": 0, "ok": 0, "maybe": 0, "unmatched": 0, "manual": 0, "hidden": 0, "far": 0}
+    for video in conn.execute(VIDEO_SQL + "ORDER BY v.msg_id").fetchall():
         stats["videos"] += 1
         if video["msg_id"] in manual:
             stats["manual"] += 1
             continue
-        near = video["days"] < NEAR_DAYS
-        hits = []
-        for source, text in video_texts(conn, video):
-            hits = [(t, conf) for t, conf in match_tracks(text, setlists.get(video["concert_id"], []))
-                    if conf == "ok" or near]
-            if hits:
-                break
-        if not hits:
-            stats["unmatched" if near else "far"] += 1
+        if video["hidden"]:
+            stats["hidden"] += 1
             continue
-        for track, confidence in hits:
-            conn.execute(
-                "INSERT OR IGNORE INTO matches(msg_id, track_id, confidence, source) VALUES(?,?,?,?)",
-                (video["msg_id"], track["id"], confidence, source),
-            )
+        hits = match_video(conn, video, setlists.get(video["concert_id"], []))
+        if not hits:
+            stats["unmatched" if is_near(video) else "far"] += 1
+            continue
+        store_hits(conn, video["msg_id"], hits)
         stats[hits[0][1]] += 1
     conn.commit()
     print(
         f"Видео в окнах концертов: {stats['videos']}; привязано: {stats['ok']} ok, "
-        f"{stats['maybe']} maybe, {stats['manual']} вручную; в подвале: {stats['unmatched']}; "
-        f"поздних без привязки (не показываем): {stats['far']}."
+        f"{stats['maybe']} maybe, {stats['manual']} вручную; скрыто: {stats['hidden']}; "
+        f"в подвале: {stats['unmatched']}; поздних без привязки (не показываем): {stats['far']}."
     )
     return stats

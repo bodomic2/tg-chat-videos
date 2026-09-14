@@ -1,0 +1,22 @@
+{# Одно видео: ссылка + форма правки. tracks — сетлист концерта для выбора. #}
+{% macro video(v, tracks, next_url) %}
+<li id="v{{ v.msg_id }}" class="video {{ v.confidence or 'none' }}">
+  <a href="{{ v.link }}" target="_blank" rel="noopener">{{ v.label }}</a>
+  {% if v.confidence == 'maybe' %}<span class="badge" title="привязано только по исполнителю">?</span>{% endif %}
+  {% if v.confidence == 'manual' %}<span class="badge" title="привязано вручную">✎</span>{% endif %}
+  {% if v.duration %}<span class="dur">{{ v.duration // 60 }}:{{ '%02d' % (v.duration % 60) }}</span>{% endif %}
+  <details class="edit">
+    <summary title="исправить">⋯</summary>
+    {% if v.caption %}<blockquote>{{ v.caption }}</blockquote>{% endif %}
+    <form method="post" action="{{ url_for('edit_video', msg_id=v.msg_id) }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <select name="track_id">
+        {% for t in tracks %}<option value="{{ t.id }}">{{ t.position }}. {{ t.artist }} — {{ t.title }}</option>{% endfor %}
+      </select>
+      <button name="action" value="match">Это эта песня</button>
+      <button name="action" value="hide" class="quiet">Не с концерта</button>
+      {% if v.confidence %}<button name="action" value="reset" class="quiet">Сбросить</button>{% endif %}
+    </form>
+  </details>
+</li>
+{% endmacro %}

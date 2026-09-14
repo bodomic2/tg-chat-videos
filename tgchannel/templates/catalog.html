@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Видео с гигов The Jammers</h1>
+<p class="muted">{{ stats.concerts }} концертов · {{ stats.songs_with_video }} песен с видео ·
+{{ stats.matched_ok + stats.matched_maybe + stats.matched_manual }} видео привязано</p>
+<form method="get" class="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="исполнитель, песня или дата (31.10.25)" autofocus>
+  <input type="hidden" name="sort" value="{{ sort }}">
+  <button>Искать</button>
+  {% if q %}<a href="{{ url_for('catalog') }}">сбросить</a>{% endif %}
+</form>
+{% macro th(key, label) %}
+  {% set d = 'asc' if (sort == key and desc) else 'desc' if sort == key else ('desc' if key == 'date' else 'asc') %}
+  <th><a href="{{ url_for('catalog', q=q, sort=key, dir=d) }}">{{ label }}{% if sort == key %} {{ '▼' if desc else '▲' }}{% endif %}</a></th>
+{% endmacro %}
+<table class="catalog">
+<thead><tr>{{ th('date', 'Концерт') }}{{ th('artist', 'Исполнитель') }}{{ th('title', 'Песня') }}<th>Видео</th></tr></thead>
+<tbody>
+{% for t in tracks %}
+<tr>
+  <td class="nowrap"><a href="{{ url_for('concert', concert_id=t.concert_id) }}#t{{ t.track_id }}">{{ t.concert_date | short_date }}</a></td>
+  <td>{{ t.artist }}</td>
+  <td>{{ t.title }}</td>
+  <td>{% for v in t.videos %}<a href="{{ v.link }}" target="_blank" rel="noopener" class="{{ v.confidence }}" title="{{ v.caption }}">{{ v.label }}</a>{% if v.confidence == 'maybe' %}<span class="badge">?</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</td>
+</tr>
+{% else %}
+<tr><td colspan="4" class="muted">Ничего не нашлось.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}

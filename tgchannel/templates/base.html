@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Видео с гигов The Jammers{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <nav>
+    <a href="{{ url_for('catalog') }}" {% if request.endpoint == 'catalog' %}class="active"{% endif %}>Каталог</a>
+    <a href="{{ url_for('concerts') }}" {% if request.endpoint in ('concerts', 'concert') %}class="active"{% endif %}>Концерты</a>
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<footer>Видео из чата «Музыканты Кипра», сетлисты с <a href="https://thejammers.org/archive">thejammers.org</a>.
+Ошиблись с привязкой? Правьте прямо здесь — авторизация не нужна.</footer>
+</body>
+</html>

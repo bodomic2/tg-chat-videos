@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_video.html" import video %}
+{% block title %}{{ concert.date | short_date }} · {{ concert.title }}{% endblock %}
+{% block content %}
+{% set here = url_for('concert', concert_id=concert.id) %}
+<p class="muted"><a href="{{ url_for('concerts') }}">← все концерты</a></p>
+<h1>{{ concert.date | short_date }} — {{ concert.title }}</h1>
+<p class="muted">{% if concert.venue %}{{ concert.venue }} · {% endif %}<a href="{{ concert.url }}">сетлист на сайте</a></p>
+
+<ol class="setlist">
+{% for t in setlist %}
+<li id="t{{ t.id }}" value="{{ t.position }}" class="{% if not t.ready %}notready{% endif %}">
+  <span class="song"><b>{{ t.artist }}</b> — {{ t.title }}</span>
+  {% if t.videos %}
+  <ul class="videos">{% for v in t.videos %}{{ video(v, setlist, here) }}{% endfor %}</ul>
+  {% endif %}
+</li>
+{% endfor %}
+</ol>
+
+<h2 id="unsorted">Подвал: без подписи или не распознано ({{ unsorted | length }})</h2>
+<p class="muted">Видео первых {{ near_days }} дней после концерта, которые не удалось привязать к песне.
+Метка: дата концерта ⇐ дата публикации − номер видео за тот день. Нажмите ⋯, чтобы привязать.</p>
+<ul class="videos basement">
+{% for v in unsorted %}{{ video(v, setlist, here) }}{% else %}<li class="muted">Пусто.</li>{% endfor %}
+</ul>
+{% endblock %}

@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS videos (
   reply_text      TEXT,               -- текст сообщения, на которое отвечает видео
   duration        INTEGER,            -- секунд
   fetched_at      TEXT,
-  concert_id      TEXT REFERENCES concerts(id) ON DELETE SET NULL  -- по окну дат, ставит match
+  concert_id      TEXT REFERENCES concerts(id) ON DELETE SET NULL,  -- по окну дат, ставит match
+  hidden          INTEGER NOT NULL DEFAULT 0  -- 1 = руками помечено «не с концерта»
 );
 CREATE INDEX IF NOT EXISTS idx_videos_date ON videos(date_utc);
 CREATE INDEX IF NOT EXISTS idx_videos_group ON videos(grouped_id);

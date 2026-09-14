@@ -19,7 +19,9 @@ def _migrate(conn):
     columns = {r["name"] for r in conn.execute("PRAGMA table_info(videos)")}
     if columns and "concert_id" not in columns:
         conn.execute("ALTER TABLE videos ADD COLUMN concert_id TEXT REFERENCES concerts(id) ON DELETE SET NULL")
-        conn.commit()
+    if columns and "hidden" not in columns:
+        conn.execute("ALTER TABLE videos ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0")
+    conn.commit()
 
 
 def get_meta(conn, key, default=None):

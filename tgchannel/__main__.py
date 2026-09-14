@@ -1,4 +1,4 @@
-"""CLI: python -m tgchannel concerts | fetch | match | all | stats | login"""
+"""CLI: python -m tgchannel concerts | fetch | match | all | stats | serve | login"""
 
 import argparse
 import sys
@@ -39,7 +39,17 @@ def main(argv=None):
 
     sub.add_parser("stats", help="сводка по базе")
 
+    p_serve = sub.add_parser("serve", help="веб-каталог с поиском и правкой привязок")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8080)
+    p_serve.add_argument("--debug", action="store_true")
+
     args = ap.parse_args(argv)
+    if args.cmd == "serve":
+        from . import web  # flask; соединения с БД открывает сам, на запрос
+
+        web.serve(host=args.host, port=args.port, debug=args.debug)
+        return 0
     conn = db.connect()
     try:
         if args.cmd == "login":

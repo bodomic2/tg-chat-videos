@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Концерты · The Jammers{% endblock %}
+{% block content %}
+<h1>Концерты</h1>
+<table class="concerts">
+<thead><tr><th>Дата</th><th>Концерт</th><th>Песен</th><th>С видео</th><th>В подвале</th></tr></thead>
+<tbody>
+{% for c in concerts %}
+<tr>
+  <td class="nowrap"><a href="{{ url_for('concert', concert_id=c.id) }}">{{ c.date | short_date }}</a></td>
+  <td>{{ c.title }}{% if c.venue %} <span class="muted">· {{ c.venue }}</span>{% endif %}</td>
+  <td>{{ c.songs }}</td>
+  <td>{{ c.songs_with_video }}</td>
+  <td>{% if c.unsorted %}<a href="{{ url_for('concert', concert_id=c.id) }}#unsorted">{{ c.unsorted }}</a>{% else %}—{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}
