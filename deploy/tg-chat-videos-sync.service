@@ -1,0 +1,7 @@
+[Unit]
+Description=tg-chat-videos: fetch new concerts and videos, re-match
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/tg-chat-videos
+ExecStart=/opt/tg-chat-videos/.venv/bin/python -m tgchannel all

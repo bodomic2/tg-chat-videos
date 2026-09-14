@@ -89,3 +89,21 @@ Sickness» находил «Down with the Sickness». Правила в `tgchann
 * `meta` — id чата, `last_video_msg_id`.
 
 Участники составов в базу не пишутся — каталогу нужны только песня и дата.
+
+## Деплой на Ubuntu (nginx + systemd, от root)
+
+```bash
+# на сервере
+git clone <repo> /opt/tg-chat-videos
+# с рабочей машины: scp .env tgchannel.session tg_chat_videos.db root@server:/opt/tg-chat-videos/
+bash /opt/tg-chat-videos/deploy/install.sh videos.example.com
+certbot --nginx -d videos.example.com
+```
+
+`deploy/install.sh` ставит venv с gunicorn, `tg-chat-videos.service`
+(gunicorn на 127.0.0.1:8080), `tg-chat-videos-sync.timer` (раз в час
+`python -m tgchannel all`: новые концерты, новые видео, перепривязка) и
+сайт nginx с указанным доменом. Базу можно не копировать — тогда первый
+запуск `all` скачает всё сам (пара минут).
+
+Обновление: `cd /opt/tg-chat-videos && git pull && systemctl restart tg-chat-videos`.

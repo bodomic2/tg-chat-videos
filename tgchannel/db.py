@@ -6,9 +6,11 @@ from . import config
 
 
 def connect(path=None):
-    conn = sqlite3.connect(path or config.db_path())
+    # timeout и WAL: веб-воркеры читают, пока таймер синхронизации пишет
+    conn = sqlite3.connect(path or config.db_path(), timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
     _migrate(conn)  # до схемы: она создаёт индексы по новым колонкам
     conn.executescript(config.SCHEMA.read_text(encoding="utf-8"))
     return conn
