@@ -13,7 +13,7 @@ import asyncio
 from datetime import datetime, timezone
 
 from telethon import TelegramClient
-from telethon.tl.types import InputMessagesFilterVideo
+from telethon.tl.types import DocumentAttributeVideo, InputMessagesFilterVideo
 
 from . import config, db
 
@@ -30,7 +30,7 @@ def message_link(msg_id, username, channel_id):
 def video_duration(message):
     video = getattr(message, "video", None)
     for attr in getattr(video, "attributes", None) or ():
-        if hasattr(attr, "duration"):
+        if isinstance(attr, DocumentAttributeVideo):
             return int(attr.duration)
     return None
 
@@ -68,7 +68,7 @@ async def _fetch_videos(client, conn, entity, username, internal_id, min_id, lim
                 m.grouped_id, m.reply_to_msg_id, video_duration(m), now,
             ),
         )
-        db.set_meta(conn, "last_msg_id", m.id)
+        db.set_meta(conn, "last_video_msg_id", m.id)
         saved += 1
         if saved % BATCH == 0:
             conn.commit()
@@ -110,7 +110,7 @@ async def _run(conn, limit=None, full=False):
         db.set_meta(conn, "channel_title", title)
         db.set_meta(conn, "channel_username", username or "")
 
-        min_id = 0 if full else int(db.get_meta(conn, "last_msg_id", 0) or 0)
+        min_id = 0 if full else int(db.get_meta(conn, "last_video_msg_id", 0) or 0)
         print(f"Чат: {title}" + (f" (@{username})" if username else " (приватный)"))
         print(f"Качаю видео с msg_id > {min_id}" + (f", не больше {limit}" if limit else ""))
         saved = await _fetch_videos(client, conn, entity, username, internal_id, min_id, limit)
@@ -124,7 +124,7 @@ async def _run(conn, limit=None, full=False):
 
 def run(conn, limit=None, full=False):
     if full:
-        db.set_meta(conn, "last_msg_id", 0)
+        db.set_meta(conn, "last_video_msg_id", 0)
     return asyncio.run(_run(conn, limit=limit, full=full))
 
 
