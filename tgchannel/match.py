@@ -38,6 +38,7 @@ ARTIST_RATIO = 0.85
 MIN_TITLE_ALONE = 2    # токенов в названии, чтобы верить ему без исполнителя
 MIN_TITLE_ALONE_LEN = 6  # или символов, если токен один
 NEAR_DAYS = 7          # дней после концерта, пока видео ещё «с концерта»
+MAX_ARTIST_ONLY_LEN = 200  # символов текста, чтобы верить одному лишь исполнителю
 # «10 - Ghost (…)» — номер песни в сетлисте перед названием
 NUMBERED = re.compile(r"^\s*#?(\d{1,2})\s*[.)\-–—:]\s*(\S.*)")
 
@@ -134,10 +135,13 @@ def match_tracks(text, tracks):
             artist_only.append(track)
     if found:
         return found
-    # только исполнитель: годится, если у него в этом сетлисте одна песня
+    # Только исполнитель: годится, если он один в тексте и у него в этом сетлисте
+    # одна песня. Несколько групп сразу или длинный текст — это анонс, а не подпись.
     by_artist = {}
     for track in artist_only:
         by_artist.setdefault(track["artist_key"], []).append(track)
+    if len(by_artist) != 1 or len(text) > MAX_ARTIST_ONLY_LEN:
+        return []
     return [(ts[0], "maybe") for ts in by_artist.values() if len(ts) == 1]
 
 

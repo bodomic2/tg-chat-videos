@@ -130,8 +130,8 @@ def flatten_track(track, position):
     lineup = []
     for seat in seats:
         user = seat.get("user") or {}
-        if seat.get("status") != "CLAIMED" or not (user.get("telegramUsername") or user.get("fullName")):
-            continue
+        if seat.get("status") != "CLAIMED" or not user.get("telegramUsername"):
+            continue  # без ника музыканта не найти и не сослаться
         slot = seat.get("lineupSlot") or {}
         lineup.append({
             "id": seat["id"],
