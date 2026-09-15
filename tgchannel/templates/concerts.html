@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Концерты · The Jammers{% endblock %}
+{% block title %}{{ t('concerts_h1') }} · The Jammers{% endblock %}
 {% block content %}
-<h1>Концерты</h1>
+<h1>{{ t('concerts_h1') }}</h1>
 <table class="concerts">
-<thead><tr><th>Дата</th><th>Концерт</th><th>Песен</th><th>С видео</th><th>В подвале</th></tr></thead>
+<thead><tr><th>{{ t('th_date') }}</th><th>{{ t('th_concert') }}</th><th>{{ t('th_songs') }}</th><th>{{ t('th_with_video') }}</th><th>{{ t('th_unsorted') }}</th></tr></thead>
 <tbody>
 {% for c in concerts %}
 <tr>

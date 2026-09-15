@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Музыканты · The Jammers{% endblock %}
+{% block title %}{{ t('musicians_h1') }} · The Jammers{% endblock %}
 {% block content %}
-<h1>Музыканты</h1>
-<p class="muted">{{ musicians | length }} человек; «песен» — сколько раз выходил на сцену на гигах, «с видео» — из них с видео в каталоге.</p>
+<h1>{{ t('musicians_h1') }}</h1>
+<p class="muted">{{ t('musicians_help', n=musicians | length) }}</p>
 <table class="musicians">
-<thead><tr><th>Ник</th><th>Имя</th><th>Песен</th><th>С видео</th></tr></thead>
+<thead><tr><th>{{ t('th_nick') }}</th><th>{{ t('th_name') }}</th><th>{{ t('th_songs') }}</th><th>{{ t('th_with_video') }}</th></tr></thead>
 <tbody>
 {% for m in musicians %}
 <tr>

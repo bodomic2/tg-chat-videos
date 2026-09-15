@@ -10,9 +10,9 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from flask import Flask, abort, g, redirect, render_template, request, url_for
+from flask import Flask, abort, g, make_response, redirect, render_template, request, url_for
 
-from . import db
+from . import db, i18n
 from .match import NEAR_DAYS, rematch_video
 from .text import norm_key
 
@@ -33,6 +33,32 @@ def _close(_exc):
     c = g.pop("conn", None)
     if c is not None:
         c.close()
+
+
+def lang():
+    value = request.cookies.get("lang", i18n.DEFAULT)
+    return value if value in i18n.LANGS else i18n.DEFAULT
+
+
+@app.context_processor
+def _inject_i18n():
+    return {"t": i18n.translator(lang()), "lang": lang(), "langs": i18n.LANGS}
+
+
+def safe_next(target, fallback):
+    """Только свои пути: не //evil.com и не /\evil.com."""
+    if not target or not target.startswith("/") or target[1:2] in ("/", "\\"):
+        return fallback
+    return target
+
+
+@app.get("/lang/<code>")
+def set_lang(code):
+    if code not in i18n.LANGS:
+        abort(404)
+    resp = make_response(redirect(safe_next(request.args.get("next"), url_for("catalog"))))
+    resp.set_cookie("lang", code, max_age=365 * 24 * 3600, samesite="Lax")
+    return resp
 
 
 # --- представление -----------------------------------------------------------
@@ -59,7 +85,7 @@ def video_view(row, concert_date, index=None):
     if index is not None:
         label = f"{short_date(concert_date)} <= {posted} - {index}"
     else:
-        label = caption_line(row["caption"]) or f"видео {posted}"
+        label = caption_line(row["caption"]) or i18n.translator(lang())("video_fallback", date=posted)
     return {
         "msg_id": row["msg_id"],
         "link": row["link"],
@@ -146,7 +172,7 @@ SORTS = {
 
 @app.get("/")
 def catalog():
-    return render_catalog(tracks(HAS_VIDEO), title="Видео с гигов The Jammers")
+    return render_catalog(tracks(HAS_VIDEO), title=i18n.translator(lang())("site"))
 
 
 @app.get("/musicians")
@@ -241,9 +267,7 @@ def edit_video(msg_id):
     else:
         abort(400)
     c.commit()
-    target = request.form.get("next", "")
-    if not target.startswith("/") or target[1:2] in ("/", "\\"):  # свои пути; не //evil.com и не /\evil.com
-        target = url_for("concert", concert_id=video["concert_id"])
+    target = safe_next(request.form.get("next"), url_for("concert", concert_id=video["concert_id"]))
     return redirect(target + f"#v{msg_id}")
 
 

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "_video.html" import video, lineup %}
+{% from "_video.html" import video, lineup with context %}
 {% block title %}{{ concert.date | short_date }} · {{ concert.title }}{% endblock %}
 {% block content %}
 {% set here = url_for('concert', concert_id=concert.id) %}
-<p class="muted"><a href="{{ url_for('concerts') }}">← все концерты</a></p>
+<p class="muted"><a href="{{ url_for('concerts') }}">{{ t('all_concerts') }}</a></p>
 <h1>{{ concert.date | short_date }} — {{ concert.title }}</h1>
-<p class="muted">{% if concert.venue %}{{ concert.venue }} · {% endif %}<a href="{{ concert.url }}">сетлист на сайте</a></p>
+<p class="muted">{% if concert.venue %}{{ concert.venue }} · {% endif %}<a href="{{ concert.url }}">{{ t('setlist_on_site') }}</a></p>
 
 <ol class="setlist">
 {% for t in setlist %}
@@ -18,10 +18,9 @@
 {% endfor %}
 </ol>
 
-<h2 id="unsorted">Подвал: без подписи или не распознано ({{ unsorted | length }})</h2>
-<p class="muted">Видео первых {{ near_days }} дней после концерта, которые не удалось привязать к песне.
-Метка: дата концерта ⇐ дата публикации − номер видео за тот день. Нажмите ⋯, чтобы привязать.</p>
+<h2 id="unsorted">{{ t('unsorted_h2', n=unsorted | length) }}</h2>
+<p class="muted">{{ t('unsorted_help', days=near_days) }}</p>
 <ul class="videos basement">
-{% for v in unsorted %}{{ video(v, setlist, here) }}{% else %}<li class="muted">Пусто.</li>{% endfor %}
+{% for v in unsorted %}{{ video(v, setlist, here) }}{% else %}<li class="muted">{{ t('empty') }}</li>{% endfor %}
 </ul>
 {% endblock %}

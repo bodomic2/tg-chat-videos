@@ -1,23 +1,23 @@
 <!doctype html>
-<html lang="ru">
+<html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Видео с гигов The Jammers{% endblock %}</title>
+<title>{% block title %}{{ t('site') }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <header>
   <nav>
-    <a href="{{ url_for('catalog') }}" {% if request.endpoint == 'catalog' %}class="active"{% endif %}>Каталог</a>
-    <a href="{{ url_for('concerts') }}" {% if request.endpoint in ('concerts', 'concert') %}class="active"{% endif %}>Концерты</a>
-    <a href="{{ url_for('musicians') }}" {% if request.endpoint in ('musicians', 'musician') %}class="active"{% endif %}>Музыканты</a>
+    <a href="{{ url_for('catalog') }}" {% if request.endpoint == 'catalog' %}class="active"{% endif %}>{{ t('nav_catalog') }}</a>
+    <a href="{{ url_for('concerts') }}" {% if request.endpoint in ('concerts', 'concert') %}class="active"{% endif %}>{{ t('nav_concerts') }}</a>
+    <a href="{{ url_for('musicians') }}" {% if request.endpoint in ('musicians', 'musician') %}class="active"{% endif %}>{{ t('nav_musicians') }}</a>
+    <span class="langs">{% for code in langs %}<a href="{{ url_for('set_lang', code=code, next=request.full_path) }}" {% if code == lang %}class="active"{% endif %}>{{ code | upper }}</a>{% endfor %}</span>
   </nav>
 </header>
 <main>
 {% block content %}{% endblock %}
 </main>
-<footer>Видео из чата «Музыканты Кипра», сетлисты с <a href="https://thejammers.org/archive">thejammers.org</a>.
-Ошиблись с привязкой? Правьте прямо здесь — авторизация не нужна.</footer>
+<footer>{{ t('footer', site='<a href="https://thejammers.org/archive">thejammers.org</a>') | safe }}</footer>
 </body>
 </html>

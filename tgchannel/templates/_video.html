@@ -2,20 +2,20 @@
 {% macro video(v, tracks, next_url) %}
 <li id="v{{ v.msg_id }}" class="video {{ v.confidence or 'none' }}">
   <a href="{{ v.link }}" target="_blank" rel="noopener">{{ v.label }}</a>
-  {% if v.confidence == 'maybe' %}<span class="badge" title="привязано только по исполнителю">?</span>{% endif %}
-  {% if v.confidence == 'manual' %}<span class="badge" title="привязано вручную">✎</span>{% endif %}
+  {% if v.confidence == 'maybe' %}<span class="badge" title="{{ t('badge_maybe') }}">?</span>{% endif %}
+  {% if v.confidence == 'manual' %}<span class="badge" title="{{ t('badge_manual') }}">✎</span>{% endif %}
   {% if v.duration %}<span class="dur">{{ v.duration // 60 }}:{{ '%02d' % (v.duration % 60) }}</span>{% endif %}
   <details class="edit">
-    <summary title="исправить">⋯</summary>
+    <summary title="{{ t('edit') }}">⋯</summary>
     {% if v.caption %}<blockquote>{{ v.caption }}</blockquote>{% endif %}
     <form method="post" action="{{ url_for('edit_video', msg_id=v.msg_id) }}">
       <input type="hidden" name="next" value="{{ next_url }}">
       <select name="track_id">
         {% for t in tracks %}<option value="{{ t.track_id }}">{{ t.position }}. {{ t.artist }} — {{ t.title }}</option>{% endfor %}
       </select>
-      <button name="action" value="match">Это эта песня</button>
-      <button name="action" value="hide" class="quiet">Не с концерта</button>
-      {% if v.confidence %}<button name="action" value="reset" class="quiet">Сбросить</button>{% endif %}
+      <button name="action" value="match">{{ t('btn_match') }}</button>
+      <button name="action" value="hide" class="quiet">{{ t('btn_hide') }}</button>
+      {% if v.confidence %}<button name="action" value="reset" class="quiet">{{ t('btn_reset') }}</button>{% endif %}
     </form>
   </details>
 </li>

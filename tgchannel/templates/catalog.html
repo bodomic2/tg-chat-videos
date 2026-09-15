@@ -1,27 +1,27 @@
 {% extends "base.html" %}
-{% from "_video.html" import lineup %}
+{% from "_video.html" import lineup with context %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-{% if musician %}<p class="muted"><a href="{{ url_for('musicians') }}">← все музыканты</a></p>{% endif %}
+{% if musician %}<p class="muted"><a href="{{ url_for('musicians') }}">{{ t('all_musicians') }}</a></p>{% endif %}
 <h1>{{ title }}</h1>
 {% if musician %}
-<p class="muted">{{ tracks | length }} песен{% if q %} по запросу{% endif %}</p>
+<p class="muted">{{ t('songs_n', n=tracks | length) }}{% if q %}{{ t('by_query') }}{% endif %}</p>
 {% else %}
-<p class="muted">{{ stats.concerts }} концертов · {{ stats.songs_with_video }} песен с видео ·
-{{ stats.matched_ok + stats.matched_maybe + stats.matched_manual }} видео привязано</p>
+<p class="muted">{{ t('stats', concerts=stats.concerts, songs=stats.songs_with_video,
+   videos=stats.matched_ok + stats.matched_maybe + stats.matched_manual) }}</p>
 {% endif %}
 <form method="get" class="search">
-  <input type="search" name="q" value="{{ q }}" placeholder="исполнитель, песня, дата (31.10.25) или музыкант" autofocus>
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ t('search_placeholder') }}" autofocus>
   <input type="hidden" name="sort" value="{{ sort }}">
-  <button>Искать</button>
-  {% if q %}<a href="{{ request.path }}">сбросить</a>{% endif %}
+  <button>{{ t('search') }}</button>
+  {% if q %}<a href="{{ request.path }}">{{ t('reset_search') }}</a>{% endif %}
 </form>
 {% macro th(key, label) %}
   {% set d = 'asc' if (sort == key and desc) else 'desc' if sort == key else ('desc' if key == 'date' else 'asc') %}
   <th><a href="{{ request.path }}?{{ {'q': q, 'sort': key, 'dir': d} | urlencode }}">{{ label }}{% if sort == key %} {{ '▼' if desc else '▲' }}{% endif %}</a></th>
 {% endmacro %}
 <table class="catalog">
-<thead><tr>{{ th('date', 'Концерт') }}{{ th('artist', 'Исполнитель') }}{{ th('title', 'Песня') }}<th>Видео</th></tr></thead>
+<thead><tr>{{ th('date', t('th_concert')) }}{{ th('artist', t('th_artist')) }}{{ th('title', t('th_title')) }}<th>{{ t('th_videos') }}</th></tr></thead>
 <tbody>
 {% for t in tracks %}
 <tr>
@@ -31,7 +31,7 @@
   <td>{% for v in t.videos %}<a href="{{ v.link }}" target="_blank" rel="noopener" class="{{ v.confidence }}" title="{{ v.caption }}">{{ v.label }}</a>{% if v.confidence == 'maybe' %}<span class="badge">?</span>{% endif %}{% if not loop.last %} · {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
 </tr>
 {% else %}
-<tr><td colspan="4" class="muted">Ничего не нашлось.</td></tr>
+<tr><td colspan="4" class="muted">{{ t('nothing_found') }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
