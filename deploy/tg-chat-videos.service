@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/tg-chat-videos
-ExecStart=/opt/tg-chat-videos/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8080 tgchannel.web:app
+ExecStart=/opt/tg-chat-videos/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:PORT tgchannel.web:app
 Restart=always
 RestartSec=3
 

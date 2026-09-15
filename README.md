@@ -96,7 +96,7 @@ Sickness» находил «Down with the Sickness». Правила в `tgchann
 # на сервере
 git clone <repo> /opt/tg-chat-videos
 # с рабочей машины: scp .env tgchannel.session tg_chat_videos.db root@server:/opt/tg-chat-videos/
-bash /opt/tg-chat-videos/deploy/install.sh videos.example.com
+bash /opt/tg-chat-videos/deploy/install.sh videos.example.com 8090   # второй параметр — порт gunicorn, если 8080 занят
 certbot --nginx -d videos.example.com
 ```
 
