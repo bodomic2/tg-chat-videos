@@ -66,6 +66,7 @@ STRINGS = {
         "en": "{n} people; “songs” — times on stage at gigs, “with video” — of those, songs with a video in the catalog.",
     },
     "th_nick": {"ru": "Ник", "en": "Nick"},
+    "theme": {"ru": "Тема: авто / тёмная / светлая", "en": "Theme: auto / dark / light"},
     "th_name": {"ru": "Имя", "en": "Name"},
 }
 

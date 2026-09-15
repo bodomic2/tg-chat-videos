@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ t('site') }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script>
+// Тема до первой отрисовки, чтобы не мигало: auto | light | dark в localStorage.
+(function () {
+  try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <header>
@@ -13,11 +19,29 @@
     <a href="{{ url_for('concerts') }}" {% if request.endpoint in ('concerts', 'concert') %}class="active"{% endif %}>{{ t('nav_concerts') }}</a>
     <a href="{{ url_for('musicians') }}" {% if request.endpoint in ('musicians', 'musician') %}class="active"{% endif %}>{{ t('nav_musicians') }}</a>
     <span class="langs">{% for code in langs %}<a href="{{ url_for('set_lang', code=code, next=request.full_path) }}" {% if code == lang %}class="active"{% endif %}>{{ code | upper }}</a>{% endfor %}</span>
+    <button type="button" id="theme" class="theme" title="{{ t('theme') }}">◐</button>
   </nav>
 </header>
 <main>
 {% block content %}{% endblock %}
 </main>
 <footer>{{ t('footer', site='<a href="https://thejammers.org/archive">thejammers.org</a>') | safe }}</footer>
+<script>
+// Кнопка темы: по кругу auto → dark → light. Значок показывает текущий режим.
+(function () {
+  var btn = document.getElementById('theme'), order = ['auto', 'dark', 'light'], icons = {auto: '◐', dark: '☾', light: '☀'};
+  function current() { try { return localStorage.getItem('theme') || 'auto'; } catch (e) { return 'auto'; } }
+  function apply(mode) {
+    if (mode === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = mode;
+    btn.textContent = icons[mode];
+  }
+  apply(current());
+  btn.addEventListener('click', function () {
+    var next = order[(order.indexOf(current()) + 1) % order.length];
+    try { localStorage.setItem('theme', next); } catch (e) {}
+    apply(next);
+  });
+})();
+</script>
 </body>
 </html>
