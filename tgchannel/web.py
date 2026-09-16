@@ -177,11 +177,13 @@ def catalog():
 
 @app.get("/musicians")
 def musicians():
+    # Треки с видео считаются один раз, а не подзапросом на каждую строку состава.
     rows = conn().execute(
+        "WITH tv AS (SELECT DISTINCT m.track_id FROM matches m "
+        "            JOIN videos v ON v.msg_id = m.msg_id WHERE v.hidden = 0) "
         "SELECT l.username, max(l.full_name) AS full_name, count(DISTINCT l.track_id) AS songs, "
-        "  count(DISTINCT m.track_id) AS with_video "
-        "FROM lineup l LEFT JOIN matches m ON m.track_id = l.track_id "
-        "  AND m.msg_id IN (SELECT msg_id FROM videos WHERE hidden = 0) "
+        "       count(DISTINCT tv.track_id) AS with_video "
+        "FROM lineup l LEFT JOIN tv ON tv.track_id = l.track_id "
         "GROUP BY l.username ORDER BY songs DESC, l.username"
     ).fetchall()
     return render_template("musicians.html", musicians=rows)
