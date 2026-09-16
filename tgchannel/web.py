@@ -7,6 +7,7 @@
 Запуск: python -m tgchannel serve [--host 0.0.0.0] [--port 8080]
 """
 
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -20,6 +21,27 @@ LOCAL_TZ = ZoneInfo("Asia/Nicosia")  # чат кипрский: даты пос�
 CAPTION_LEN = 60
 
 app = Flask(__name__)
+# Статика кэшируется год: в ссылках стоит ?v=<mtime>, так что новая версия файла — новый URL.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 365 * 24 * 3600
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+
+def static_url(filename):
+    try:
+        version = int(os.stat(os.path.join(STATIC_DIR, filename)).st_mtime)
+    except OSError:
+        version = 0
+    return url_for("static", filename=filename, v=version)
+
+
+@app.after_request
+def _cache_headers(resp):
+    """HTML и редиректы не кэшировать (Cloudflare это соблюдает): правки должны быть видны сразу.
+    Ответ зависит от cookie lang — Vary, чтобы промежуточный кэш не отдал русскую версию англичанину."""
+    if request.endpoint != "static":
+        resp.headers["Cache-Control"] = "private, no-cache"
+        resp.headers.add("Vary", "Cookie")
+    return resp
 
 
 def conn():
@@ -98,6 +120,7 @@ def video_view(row, concert_date, index=None):
 
 
 app.jinja_env.filters["short_date"] = short_date
+app.jinja_env.globals["static_url"] = static_url
 
 
 # --- выборки -----------------------------------------------------------------
