@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT / ".env"
 SCHEMA = ROOT / "schema.sql"
+SETLIST_OVERRIDES = ROOT / "setlist_overrides.json"
 OUT_DIR = ROOT / "out"
 SESSION = str(ROOT / "tgchannel")  # telethon сам добавит .session
 

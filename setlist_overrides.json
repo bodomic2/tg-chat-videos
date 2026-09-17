@@ -1,0 +1,30 @@
+{
+  "_comment": "Концерт → что реально сыграли, по порядку. Остальные треки с доски сайта выкидываются. Ключ — id события на thejammers.org. Строка сверяется с доской по нормализованным исполнителю и названию, при расхождении в мелочах — нечётко.",
+  "cmpqpi7qv000fvz01qu6wkj7b": [
+    "Tame Impala — The Less I Know the Better",
+    "Phantogram — When I'm Small",
+    "Placebo — Follow the Cops Back Home",
+    "Smash Mouth — All Star",
+    "Nizkiz — Небяспечна",
+    "Nervy — Happy ми",
+    "Bravo & Zhanna Aguzarova — Ленинградский рок-н-ролл",
+    "New Years Day — My Monsters",
+    "Paul McCartney & Wings — Band On The Run",
+    "Royal Republic — Addictive",
+    "Dorothy — I COME ALIVE",
+    "Blur — Song 2",
+    "Biting Elbows — Toothpick",
+    "Avatar — When The Snow Lies Red",
+    "TesseracT — April",
+    "Evanescence — Who Will You Follow",
+    "Dream Theater — As I Am",
+    "ТЕППО & DRUMMATIX — Сон Нереид",
+    "Type O Negative — I Don't Wanna Be Me",
+    "Black Sabbath — Paranoid",
+    "Kyuss — Gardenia",
+    "LINKIN PARK — Faint (Live In Texas)",
+    "Rammstein — Sonne",
+    "Godsmack — I Stand Alone",
+    "Rage Against the Machine — Killing in the Name (Live at 2000 Democratic National Convention)"
+  ]
+}

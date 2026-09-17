@@ -8,8 +8,13 @@
 
 Сырой JSON треков сохраняется в concerts.raw_json, так что разбор можно
 перегнать без повторной выкачки: `concerts --reparse`.
+
+setlist_overrides.json: для концерта, у которого на доске сайта лежат все
+предложения, а не то, что сыграли, — список «Исполнитель — Название» по порядку.
+Остаются только эти треки, в этом порядке; применяется при каждой загрузке.
 """
 
+import difflib
 import html
 import json
 import re
@@ -17,6 +22,7 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
+from . import config
 from .text import norm_key
 
 BASE = "https://thejammers.org"
@@ -171,13 +177,43 @@ def store_concert(conn, concert, raw_tracks, fetched_at):
     store_setlist(conn, concert["id"], raw_tracks)
 
 
+def load_overrides():
+    if not config.SETLIST_OVERRIDES.exists():
+        return {}
+    data = json.loads(config.SETLIST_OVERRIDES.read_text(encoding="utf-8"))
+    return {k: v for k, v in data.items() if not k.startswith("_")}
+
+
+def apply_override(tracks, wanted, concert_id):
+    """Оставляет из tracks только строки wanted («Исполнитель — Название»), в их порядке."""
+    by_key = {f"{t['artist_key']} — {t['title_key']}": t for t in tracks}
+    kept, used = [], set()
+    for line in wanted:
+        artist, _, title = line.partition("—")
+        key = f"{norm_key(artist)} — {norm_key(title)}"
+        track = by_key.get(key)
+        if track is None:  # мелкие расхождения: регистр уже снят, остаются опечатки/скобки
+            close = difflib.get_close_matches(key, [k for k in by_key if k not in used], n=1, cutoff=0.8)
+            track = by_key[close[0]] if close else None
+        if track is None or track["id"] in used:
+            print(f"  ! {concert_id}: в сетлисте сайта не нашлось «{line.strip()}»")
+            continue
+        used.add(track["id"])
+        kept.append(dict(track, position=len(kept) + 1))
+    return kept
+
+
 def store_setlist(conn, concert_id, raw_tracks):
     """Обновляет сетлист и состав концерта из сырого JSON.
 
     Треки обновляются по id (он у сайта стабильный), а не удаляются и вставляются
     заново: на setlist ссылаются matches, и DELETE снёс бы ручные привязки.
+    Удаляются только треки, которых больше нет (на сайте или в overrides).
     """
     tracks = [flatten_track(raw, pos) for pos, raw in enumerate(raw_tracks, 1)]
+    wanted = load_overrides().get(concert_id)
+    if wanted:
+        tracks = apply_override(tracks, wanted, concert_id)
     conn.executemany(
         "INSERT INTO setlist(id, concert_id, position, artist, title, artist_key, title_key, "
         "state, ready, comment) VALUES(?,?,?,?,?,?,?,?,?,?) "
