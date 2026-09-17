@@ -193,7 +193,8 @@ def apply_override(tracks, wanted, concert_id):
         key = f"{norm_key(artist)} — {norm_key(title)}"
         track = by_key.get(key)
         if track is None:  # мелкие расхождения: регистр уже снят, остаются опечатки/скобки
-            close = difflib.get_close_matches(key, [k for k in by_key if k not in used], n=1, cutoff=0.8)
+            free = [k for k, t in by_key.items() if t["id"] not in used]
+            close = difflib.get_close_matches(key, free, n=1, cutoff=0.8)
             track = by_key[close[0]] if close else None
         if track is None or track["id"] in used:
             print(f"  ! {concert_id}: в сетлисте сайта не нашлось «{line.strip()}»")
