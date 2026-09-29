@@ -27,6 +27,9 @@ import unicodedata
 from .text import QUOTES
 
 TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
+# В подписях перечисляют состав: «@vasily_from_openspace». Ник — не название песни,
+# а «vasily» слишком похоже на «Easily», чтобы оставлять его в тексте для сравнения.
+MENTION = re.compile(r"@\w+|https?://\S+", re.UNICODE)
 PARENS = re.compile(r"\s*[(\[][^()\[\]]*[)\]]")
 STOPWORDS = {
     "a", "an", "the", "of", "and", "or", "in", "on", "at", "to", "for", "by", "with",
@@ -57,6 +60,11 @@ def key_tokens(text):
     toks = tokens(text)
     keep = [t for t in toks if t not in STOPWORDS and len(t) > 1]
     return keep or toks
+
+
+def caption_tokens(text):
+    """Токены подписи: без @ников и ссылок — они не часть названия."""
+    return key_tokens(MENTION.sub(" ", text or ""))
 
 
 def strip_parens(title):
@@ -112,7 +120,7 @@ def match_by_number(text, tracks):
         return None
     position, rest = int(m.group(1)), m.group(2)
     for track in tracks:
-        if track["position"] == position and match_title(track["title"], key_tokens(rest)):
+        if track["position"] == position and match_title(track["title"], caption_tokens(rest)):
             return track
     return None
 
@@ -122,7 +130,7 @@ def match_tracks(text, tracks):
     numbered = match_by_number(text, tracks)
     if numbered:
         return [(numbered, "ok")]
-    text_key = key_tokens(text)
+    text_key = caption_tokens(text)
     if not text_key:
         return []
     found = []
