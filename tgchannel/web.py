@@ -8,6 +8,7 @@
 """
 
 import os
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -19,6 +20,9 @@ from .text import norm_key
 
 LOCAL_TZ = ZoneInfo("Asia/Nicosia")  # чат кипрский: даты постов показываем по местному времени
 CAPTION_LEN = 60
+# Официальный Post Widget умеет встраивать пост публичного чата: t.me/<username>/<id>.
+# Приватные ссылки вида t.me/c/<id>/<msg> он не берёт — у таких видео кнопки не будет.
+PUBLIC_POST = re.compile(r"^https://t\.me/(?!c/)([\w\d_]+/\d+)$")
 
 app = Flask(__name__)
 # Статика кэшируется год: в ссылках стоит ?v=<mtime>, так что новая версия файла — новый URL.
@@ -108,9 +112,11 @@ def video_view(row, concert_date, index=None):
         label = f"{short_date(concert_date)} <= {posted} - {index}"
     else:
         label = caption_line(row["caption"]) or i18n.translator(lang())("video_fallback", date=posted)
+    post = PUBLIC_POST.match(row["link"] or "")
     return {
         "msg_id": row["msg_id"],
         "link": row["link"],
+        "post": post.group(1) if post else None,
         "posted": posted,
         "label": label,
         "caption": row["caption"],

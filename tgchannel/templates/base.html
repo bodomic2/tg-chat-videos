@@ -27,6 +27,31 @@
 </main>
 <footer>{{ t('footer', site='<a href="https://thejammers.org/archive">thejammers.org</a>') | safe }}</footer>
 <script>
+// Видео прямо на странице: официальный Post Widget телеграма, по клику на ▶.
+// Скрипт вставляется один раз на видео и сам подменяется на iframe с постом.
+(function () {
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.play');
+    if (!btn) return;
+    var box = btn.closest('li').querySelector('.embed');
+    if (!box) return;
+    if (box.dataset.loaded) { box.hidden = !box.hidden; btn.classList.toggle('on', !box.hidden); return; }
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://telegram.org/js/telegram-widget.js?22';
+    s.setAttribute('data-telegram-post', btn.dataset.post);
+    s.setAttribute('data-width', '100%');
+    if (document.documentElement.dataset.theme === 'dark' ||
+        (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches)) {
+      s.setAttribute('data-dark', '1');
+    }
+    box.appendChild(s);
+    box.dataset.loaded = '1';
+    box.hidden = false;
+    btn.classList.add('on');
+  });
+})();
+
 // Кнопка темы: по кругу auto → dark → light. Значок показывает текущий режим.
 (function () {
   var btn = document.getElementById('theme'), order = ['auto', 'dark', 'light'], icons = {auto: '◐', dark: '☾', light: '☀'};

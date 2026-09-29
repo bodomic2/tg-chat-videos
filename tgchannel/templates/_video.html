@@ -5,6 +5,7 @@
   {% if v.confidence == 'maybe' %}<span class="badge" title="{{ t('badge_maybe') }}">?</span>{% endif %}
   {% if v.confidence == 'manual' %}<span class="badge" title="{{ t('badge_manual') }}">✎</span>{% endif %}
   {% if v.duration %}<span class="dur">{{ v.duration // 60 }}:{{ '%02d' % (v.duration % 60) }}</span>{% endif %}
+  {% if v.post %}<button type="button" class="play" data-post="{{ v.post }}" title="{{ t('play') }}">▶</button>{% endif %}
   <details class="edit">
     <summary title="{{ t('edit') }}">⋯</summary>
     {% if v.caption %}<blockquote>{{ v.caption }}</blockquote>{% endif %}
@@ -18,6 +19,7 @@
       {% if v.confidence %}<button name="action" value="reset" class="quiet">{{ t('btn_reset') }}</button>{% endif %}
     </form>
   </details>
+  {% if v.post %}<div class="embed" hidden></div>{% endif %}
 </li>
 {% endmacro %}
 

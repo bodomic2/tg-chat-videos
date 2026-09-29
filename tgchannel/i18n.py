@@ -57,6 +57,7 @@ STRINGS = {
     "badge_maybe": {"ru": "привязано только по исполнителю", "en": "matched by artist only"},
     "badge_manual": {"ru": "привязано вручную", "en": "matched by hand"},
     "edit": {"ru": "исправить", "en": "fix"},
+    "play": {"ru": "посмотреть здесь", "en": "watch here"},
     "btn_match": {"ru": "Это эта песня", "en": "It's this song"},
     "btn_hide": {"ru": "Не с концерта", "en": "Not from the gig"},
     "btn_reset": {"ru": "Сбросить", "en": "Reset"},
