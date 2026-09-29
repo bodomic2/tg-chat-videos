@@ -29,9 +29,10 @@
 <script>
 // Видео прямо на странице: официальный Post Widget телеграма, по клику на ▶.
 // Скрипт вставляется один раз на видео и сам подменяется на iframe с постом.
+// Тема виджета берётся в момент вставки: переключение темы уже открытые не перекрашивает.
 (function () {
   document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.play');
+    var btn = e.target instanceof Element ? e.target.closest('.play') : null;
     if (!btn) return;
     var box = btn.closest('li').querySelector('.embed');
     if (!box) return;
