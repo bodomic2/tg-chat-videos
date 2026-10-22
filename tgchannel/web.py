@@ -7,14 +7,18 @@
 Запуск: python -m tgchannel serve [--host 0.0.0.0] [--port 8080]
 """
 
+import hashlib
+import json
 import os
 import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from flask import Flask, abort, g, make_response, redirect, render_template, request, url_for
+from flask import (
+    Flask, Response, abort, g, make_response, redirect, render_template, request, url_for,
+)
 
-from . import db, i18n
+from . import api, db, i18n
 from .match import NEAR_DAYS, rematch_video
 from .text import norm_key
 
@@ -41,8 +45,9 @@ def static_url(filename):
 @app.after_request
 def _cache_headers(resp):
     """HTML и редиректы не кэшировать (Cloudflare это соблюдает): правки должны быть видны сразу.
-    Ответ зависит от cookie lang — Vary, чтобы промежуточный кэш не отдал русскую версию англичанину."""
-    if request.endpoint != "static":
+    Ответ зависит от cookie lang — Vary, чтобы промежуточный кэш не отдал русскую версию англичанину.
+    Статика и сводка для thejammers.org ставят свои заголовки: они кэшируются и языка не знают."""
+    if request.endpoint not in ("static", "api_summary"):
         resp.headers["Cache-Control"] = "private, no-cache"
         resp.headers.add("Vary", "Cookie")
     return resp
@@ -300,6 +305,30 @@ def edit_video(msg_id):
     c.commit()
     target = safe_next(request.form.get("next"), url_for("concert", concert_id=video["concert_id"]))
     return redirect(target + f"#v{msg_id}")
+
+
+@app.get("/api/summary.json")
+def api_summary():
+    """Сводка для thejammers.org: какие гиги, песни и музыканты имеют видео.
+
+    Договор с тем сайтом в tgchannel/api.py — форму version 1 менять нельзя.
+    Ошибку отдаём 5xx и JSON, чтобы их сторона не приняла HTML за данные.
+    """
+    try:
+        payload = api.summary(conn(), NEAR_DAYS)
+    except Exception:  # noqa: BLE001 — наружу уходит 503, подробности в лог
+        app.logger.exception("не собралась сводка /api/summary.json")
+        return Response(
+            json.dumps({"error": "summary unavailable"}),
+            status=503,
+            mimetype="application/json",
+        )
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    resp = Response(body, mimetype="application/json")
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    resp.set_etag(hashlib.sha256(body).hexdigest()[:32])
+    return resp.make_conditional(request)
 
 
 def serve(host="127.0.0.1", port=8080, debug=False):

@@ -81,6 +81,26 @@ Sickness» находил «Down with the Sickness». Правила в `tgchann
 Для сервера: `serve --host 0.0.0.0` за nginx или любым WSGI (`tgchannel.web:app`).
 Авторизации нет намеренно — правит чат.
 
+## API для thejammers.org
+
+`GET /api/summary.json` — сводка, по которой тот сайт решает, у каких гигов и
+песен показывать «▶» со ссылкой сюда. Без авторизации, одинаковая для обоих
+языков, `Cache-Control: public, max-age=3600` + ETag (на `If-None-Match`
+отвечает 304). Форма зафиксирована как `version: 1`, договор и правила счёта —
+в `tgchannel/api.py`; несовместимые изменения только отдельным `version: 2`.
+
+```json
+{"version":1,"updatedAt":"2026-10-21T15:00:00Z",
+ "totals":{"gigs":37,"songs":183,"videos":1948},
+ "gigs":[{"id":"<id события>","videos":34,"tracks":[{"id":"<id трека>","videos":1}]}],
+ "musicians":[{"telegram":"a_krotov","videos":12}]}
+```
+
+Идентификаторы — те же, что в наших ссылках `/concert/<id>#t<id>` и
+`/musician/<ник>`, они и так пришли с thejammers.org. В счёт идут привязки
+`ok` и `manual` плюс видео из подвала (они попадают в `gigs[].videos` и
+`totals.videos`, но не в `tracks`); привязки `maybe` и скрытые видео — нет.
+
 ## База
 
 `tg_chat_videos.db` рядом с проектом (или `TG_DB`), схема в `schema.sql`:
