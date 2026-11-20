@@ -35,15 +35,28 @@ MONTHS = {
     "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
-# <a href="/events/ID"><div>28 Jun 2026</div><div><h2>Music Hall</h2><p>16:00 · Title</p></div>
-# Если площадки нет, в <h2> лежит название, а в <p> только время.
-ARCHIVE_ITEM = re.compile(
-    r'<a [^>]*href="/events/(?P<id>[a-z0-9]+)"[^>]*>'
-    r"<div[^>]*>(?P<date>[^<]+)</div>"
-    r"<div[^>]*><h2[^>]*>(?P<h2>[^<]+)</h2><p[^>]*>(?P<p>.*?)</p></div>"
-    r".*?<span[^>]*>(?P<tracks>\d+)<!-- -->",
-    re.DOTALL,
+# Вёрстка архива с ноября 2026 (до этого строки были <a><div>дата</div><h2>…</h2><p>…</p></a>):
+# <li data-archive-row="true"> — одна строка на концерт, внутри десктопная и мобильная версии.
+#   <span>13 Dec</span><span>2026 · Sun</span>                         дата
+#   <a data-archive-row-title="true" href="/events/ID">Название</a>   название; у концерта без
+#                                                                      своего названия — «The Jammers · 13 December 2026»
+#   <span data-archive-row-meta="true">Music Hall · 19:00</span>       площадка · время
+#   <span>24 songs</span>                                              число треков
+# Предстоящие концерты лежат в <section data-archive-upcoming="true">: на их страницах доска
+# с предложениями, а не сыгранный сетлист, так что их не качаем (известные концерты потом
+# не перекачиваются, снимок «до концерта» остался бы навсегда).
+ARCHIVE_UPCOMING = re.compile(r'<section[^>]*data-archive-upcoming="true".*?</section>', re.DOTALL)
+ARCHIVE_ROW = re.compile(r'<li [^>]*data-archive-row="true"[^>]*>(?P<row>.*?)</li>', re.DOTALL)
+# Год в блоке даты бывает только у предстоящих; у архивных — один день недели («Sun»).
+ARCHIVE_DATE = re.compile(r"<span[^>]*>(?P<dm>\d{1,2} [A-Za-z]+)</span><span[^>]*>(?:(?P<year>\d{4}) · )?(?P<wd>[A-Za-z]{3})</span>")
+TITLE_DATE = re.compile(r"\d{1,2} [A-Za-z]+ (?P<year>\d{4})")
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+ARCHIVE_TITLE = re.compile(
+    r'<a [^>]*data-archive-row-title="true"[^>]*href="/events/(?P<id>[a-z0-9]+)"[^>]*>(?P<title>[^<]*)</a>'
+    r'<span[^>]*data-archive-row-meta="true"[^>]*>(?P<meta>[^<]*)</span>'
 )
+ARCHIVE_SONGS = re.compile(r">(?P<n>\d+) songs?<")
+TIME_ONLY = re.compile(r"\d{1,2}:\d{2}")
 RSC_CHUNK = re.compile(r'self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)')
 RSC_LINE = re.compile(r"^[0-9a-f]+:(?=[\[{])")
 
@@ -64,26 +77,68 @@ def parse_date(text):
     return f"{int(year):04d}-{MONTHS[month.lower().rstrip('.')]:02d}-{int(day):02d}"
 
 
+def _fill_years(rows):
+    """Год каждой строки: из блока даты, из сгенерированного названия, иначе — из соседей.
+
+    У архивных строк года нет, только день недели. Концерт без своего названия несёт полную дату в
+    названии; у остальных год выбираем среди годов соседних строк (список идёт от новых к старым,
+    так что год не может выйти за границы соседей) так, чтобы совпал день недели. Если однозначно
+    не вышло — ошибка: неверная дата хуже отсутствующей, концерт записался бы в базу навсегда."""
+    for r in rows:
+        r["year"] = r["year"] or r["title_year"]
+    for i, r in enumerate(rows):
+        if r["year"]:
+            continue
+        above = next((x["year"] for x in reversed(rows[:i]) if x["year"]), None)
+        below = next((x["year"] for x in rows[i + 1:] if x["year"]), None)
+        known = [y for y in (above, below) if y]
+        if not known:
+            raise ValueError(f"не определить год концерта {r['id']}: ни у одной строки нет года")
+        fits = [y for y in range(min(known), max(known) + 1)
+                if WEEKDAYS[datetime(y, r["month"], r["day"]).weekday()] == r["wd"]]
+        if len(fits) != 1:
+            raise ValueError(f"не определить год концерта {r['id']}: подходят годы {fits} ({r['day']}.{r['month']} {r['wd']})")
+        r["year"] = fits[0]
+    for r in rows:
+        if WEEKDAYS[datetime(r["year"], r["month"], r["day"]).weekday()] != r["wd"]:
+            raise ValueError(f"день недели не сходится с датой у концерта {r['id']}: {r['day']}.{r['month']}.{r['year']} {r['wd']}")
+
+
 def parse_archive(page):
     """Список концертов со страницы архива, в порядке сайта (новые сверху)."""
-    concerts = []
-    for m in ARCHIVE_ITEM.finditer(page):
-        h2, p = _clean(m.group("h2")), _clean(m.group("p"))
-        if " · " in p:
-            time_, title = p.split(" · ", 1)
-            venue = h2
-        else:
-            time_, title, venue = p, h2, None
-        concerts.append({
-            "id": m.group("id"),
-            "date": parse_date(_clean(m.group("date"))),
-            "time": time_.strip() or None,
-            "title": title.strip(),
-            "venue": venue,
-            "url": f"{BASE}/events/{m.group('id')}",
-            "track_count": int(m.group("tracks")),
+    rows = []
+    for m in ARCHIVE_ROW.finditer(ARCHIVE_UPCOMING.sub("", page)):
+        row = m.group("row")
+        d, t, s = ARCHIVE_DATE.search(row), ARCHIVE_TITLE.search(row), ARCHIVE_SONGS.search(row)
+        if not (d and t and s):
+            # Строку, которую не разобрали, нельзя молча пропустить: концерт выпал бы из архива навсегда.
+            raise ValueError(f"строка архива не разобралась (вёрстка снова поменялась?): {_clean(row)[:120]!r}")
+        day, month = d.group("dm").split()
+        title, meta = _clean(t.group("title")), _clean(t.group("meta"))
+        # Сгенерированное название «The Jammers · 13 December 2026»: дата в нём лишняя (она в поле date),
+        # но из неё берём год.
+        title_year = None
+        head, sep, tail = title.rpartition(" · ")
+        if sep and (td := TITLE_DATE.fullmatch(tail)):
+            title, title_year = head, int(td.group("year"))
+        venue, sep, time_ = meta.rpartition(" · ")
+        if not sep:  # в мете только время (или только площадка)
+            venue, time_ = (None, meta) if TIME_ONLY.fullmatch(meta) else (meta or None, "")
+        rows.append({
+            "id": t.group("id"), "day": int(day), "month": MONTHS[month.lower().rstrip(".")], "wd": d.group("wd"),
+            "year": int(d.group("year")) if d.group("year") else None, "title_year": title_year,
+            "time": time_.strip() or None, "title": title, "venue": venue, "track_count": int(s.group("n")),
         })
-    return concerts
+    _fill_years(rows)
+    return [{
+        "id": r["id"],
+        "date": f"{r['year']:04d}-{r['month']:02d}-{r['day']:02d}",
+        "time": r["time"],
+        "title": r["title"],
+        "venue": r["venue"],
+        "url": f"{BASE}/events/{r['id']}",
+        "track_count": r["track_count"],
+    } for r in rows]
 
 
 def rsc_stream(page):
